@@ -3,12 +3,15 @@ MODULE = '''(module
    {imports}
    (memory 1)
    (export "memory" (memory 0))
+   ;; data section
    {data}
+   ;; module body
    {body}
 )'''
 
 FUNC = '''
 (func ${name}_{arity} {params} {result}
+{localvars}
 {body}
 )
 '''
@@ -116,6 +119,8 @@ def produce_wasm(module):
 
       arg -= 1
 
+    b += f';; arity {func.arity}, input put into X registers\n'
+
     def push(typ, num, part):
       nonlocal b
       assert part in ['val', 'tag']
@@ -160,9 +165,54 @@ def produce_wasm(module):
       push(styp, snum, 'val')
       pop(dtyp, dnum, 'val')
 
+    def push_return():
+      nonlocal b
+      b += ';; push X0 to stack\n'
+
+      # Beam uses X0 as function result.
+      # Put return registers to stack.
+      push('x', 0, 'tag')
+      push('x', 0, 'val')
+      b += 'return\n'
+
+
+    def populate_with(dtyp, reg_n, value):
+      [typ, [val]] = value
+      if typ == 'integer':
+        set_const(dtyp, reg_n, val, 0)
+      elif typ == 'literal':
+        mem_offset = add_literal(val)
+        set_const(dtyp, reg_n, mem_offset, 10)
+      elif typ == 'atom':
+        set_const(dtyp, reg_n, 0, 20) # TODO: implement atoms
+      elif typ == 'x' or typ == 'y':
+        val = int(val)
+        move(typ, val, dtyp, reg_n)
+      else:
+        assert False, 'not implemented {typ}'.format(typ=typ)
+
+    def populate_stack_with(value):
+      [typ, [val]] = value
+      nonlocal b
+      if typ == 'integer':
+        b += f'(i32.const {val})\n'
+      elif typ == 'literal':
+        mem_offset = add_literal(val)
+        b += f'(i32.const {mem_offset})\n'
+      elif typ == 'atom':
+        b += f'(i32.const 0)\n' # TODO: implement atoms
+      elif typ == 'x' or typ == 'y':
+        push(typ, int(val), 'val')
+      else:
+        assert False, 'not implemented {typ}'.format(typ=typ)
+
+    inside_block = False
     for statement in func.statements:
       styp = statement[0]
       sbody = statement[1]
+      if styp == 'return':
+        push_return()
+
       if styp == 'allocate':
         [yreg, xreg] = sbody
         max_yregs = max(max_yregs, int(yreg))
@@ -176,19 +226,30 @@ def produce_wasm(module):
           move('y', yreg + nremove, 'y', yreg)
 
       if styp == 'move':
-        [(styp, [sval]), (dtyp, [dval])] = sbody
+        [source, (dtyp, [dval])] = sbody
         dval = int(dval)
+        populate_with(dtyp, dval, source)
 
-        if styp == 'integer':
-          set_const(dtyp, dval, sval, 0)
-        elif styp == 'literal':
-          mem_offset = add_literal(sval)
-          set_const(dtyp, dval, mem_offset, 10)
-        elif styp == 'x' or styp == 'y':
-          sval = int(sval)
-          move(styp, sval, dtyp, dval)
+      if styp == 'label':
+        if inside_block:
+          b += ') ;; end of block\n'
+          inside_block = False
+
+      if styp == 'test':
+        [op, _f, [arg0, arg1]] = sbody
+        inside_block = True
+        b += '(block \n'
+        populate_stack_with(arg0)
+        populate_stack_with(arg1)
+
+        if op == 'is_lt':
+          b += 'i32.lt_u\n'
         else:
-          continue
+          assert False, f'Not implemented {op}'
+
+        b += '(i32.const 0)\n'
+        b += '(i32.eq)\n'
+        b += '(br_if 0)\n'
 
       if styp == 'call_ext':
         [ext_mod, ext_fn, ext_fn_arity] = statement[1][1][1]
@@ -203,6 +264,17 @@ def produce_wasm(module):
         pop('x', 0, 'val')
         pop('x', 0, 'tag')
 
+      if styp == 'call_ext_only':
+        [ext_mod, ext_fn, ext_fn_arity] = statement[1][1][1]
+        add_import(ext_mod, ext_fn, ext_fn_arity)
+        max_xregs = max(max_xregs, int(ext_fn_arity))
+
+        for xreg in range(0, int(ext_fn_arity)):
+          push('x', xreg, 'tag')
+          push('x', xreg, 'val')
+
+        b += f'call ${ext_mod}_{ext_fn}_{ext_fn_arity}\n'
+
       if styp == 'call_only':
         [arity, (_f, [findex])] = sbody
         arity = int(arity)
@@ -215,20 +287,13 @@ def produce_wasm(module):
           push('x', xreg, 'val')
 
         b += f'call ${into_func.name}_{into_func.arity}\n'
-        pop('x', 0, 'val')
-        pop('x', 0, 'tag')
-
 
       if styp == 'gc_bif':
         [op, _fall, arity, [arg0, arg1], ret] = sbody
-        (arg0t, [arg0v]) = arg0
-        (arg1t, [arg1v]) = arg1
         (retT, [retV]) = ret
 
-        if arg0t == 'x' or arg0t == 'y':
-          push(arg0t, int(arg0v), 'val')
-        if arg1t == 'x' or arg1t == 'y':
-          push(arg1t, int(arg1v), 'val')
+        populate_stack_with(arg0)
+        populate_stack_with(arg1)
 
         if op == "'+'":
           b += 'i32.add\n'
@@ -239,10 +304,9 @@ def produce_wasm(module):
 
     assert stack == 0
 
-    # Beam uses X0 as function result.
-    # Put return registers to stack.
-    push('x', 0, 'tag')
-    push('x', 0, 'val')
+    if inside_block:
+      b += ') ;; end of last block\n'
+      b += 'unreachable\n'
 
     localvars = '\n'
     for xreg in range(0, max_xregs):
@@ -256,9 +320,11 @@ def produce_wasm(module):
     body += FUNC.format(
       name=func.name,
       arity=func.arity,
+      start_label=func.start_label,
       params=make_in_params_n(int(func.arity) * 2),
       result=make_result_n(2),
-      body=localvars + b
+      localvars=localvars,
+      body=b,
     )
 
   return MODULE.format(

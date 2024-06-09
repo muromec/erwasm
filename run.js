@@ -63,14 +63,16 @@ const wasi = new WASI({
         console.log('log/' + (arguments.length/2), ...unpackedArgs);
         return [0, 0];
       }
-    }
+    },
+    erlang: {
+      get_module_info() {
+        throw new Error("We are not supposed to be here");
+      }
+    },
   };
   const instance = new WebAssembly.Instance(wasm, imports);
   console.log('sum', call('sum', 1, 3));
+  console.log('conditional', call('conditional', 100));
 
-  console.log('sum', call('sum', 7));
-
-  // console.log('second', call('second'));
-  // console.log('other', call('other'));
 
 })();

@@ -66,6 +66,9 @@ def parse_sentence(text):
   class State:
    idx = 1
 
+  if text == 'return':
+    return 'return', []
+
   return parse_sentence_helper(text, State)
 
 
@@ -77,6 +80,13 @@ def parse_beam(text):
     if state == None and symbol == '{':
       state = 'inside'
       sentence = symbol
+    elif state == None and symbol == '%':
+      state = 'comment'
+    elif state == None and symbol == 'r':
+      state = 'inside'
+      sentence = symbol
+    elif state == 'comment' and symbol == '\n':
+      state = None
     elif state == 'inside' and symbol == '.':
       state = None
       ret.append(sentence)
