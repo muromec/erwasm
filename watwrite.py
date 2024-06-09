@@ -70,42 +70,36 @@ def produce_wasm(module):
   data = ''
   imports = []
 
-  literalidx = 0
-  for func in module.functions:
-    for statement in func.statements:
-      styp = statement[0]
-      sbody = statement[1]
+  def add_import(ext_mod, ext_fn, ext_fn_arity):
+    import_line = FUNC_IMPORT.format(
+      mod=ext_mod, fn=ext_fn,
+      arity=int(ext_fn_arity),
+      params = make_params_n(int(ext_fn_arity) * 2),
+    )
+    if import_line not in imports:
+      imports.append(import_line)
 
-      if styp == 'move':
-        [(styp, [sval]), (dtyp, [dval])] = sbody
-        if styp == 'literal':
-          data += LITERAL.format(
-            offset0 = literalidx,
-            offset1 = literalidx + 4,
-            llen = make_len(len(sval)),
-            lval = sval,
-          )
-          literalidx += 4
-          literalidx += len(sval)
-
-      if styp == 'call_ext':
-        [ext_mod, ext_fn, ext_fn_arity] = statement[1][1][1]
-        import_line = FUNC_IMPORT.format(
-          mod=ext_mod, fn=ext_fn,
-          arity=int(ext_fn_arity),
-          params = make_params_n(int(ext_fn_arity) * 2),
-        )
-        if import_line not in imports:
-          imports.append(import_line)
+  def add_literal(sval):
+    nonlocal data
+    nonlocal literalidx
+    mem_offset = literalidx
+    data += LITERAL.format(
+      offset0 = literalidx,
+      offset1 = literalidx + 4,
+      llen = make_len(len(sval)),
+      lval = sval,
+    )
+    literalidx += 4
+    literalidx += len(sval)
+    return mem_offset
 
   literalidx = 0
   for func in module.functions:
-    max_arity = max(int(func.arity), 1)
+    max_xregs = max(int(func.arity), 1)
     max_yregs = 0
     if (func.name, func.arity) in module.export_funcs:
       body += FUNC_EXPORT.format(name=func.name, arity=func.arity)
 
-    localvars = '\n'
     b = '\n'
 
     stack = 0
@@ -122,76 +116,108 @@ def produce_wasm(module):
 
       arg -= 1
 
+    def push(typ, num, part):
+      nonlocal b
+      assert part in ['val', 'tag']
+      assert typ in ['x', 'y']
+      if typ == 'x':
+        assert num <= max_xregs
+      if typ == 'y':
+        assert num <= max_yregs
+
+      b += f'local.get $var_{typ}reg_{num}_{part}\n'
+
+    def pop(typ, num, part):
+      nonlocal b
+      nonlocal max_xregs
+      nonlocal max_yregs
+
+      assert part in ['val', 'tag']
+      assert typ in ['x', 'y']
+
+      if typ == 'x':
+        max_xregs = max(max_xregs, num + 1)
+      if typ == 'y':
+        max_yregs = max(max_yregs, num, + 1)
+
+      b += f'local.set $var_{typ}reg_{num}_{part}\n'
+
+    def set_typ_reg(typ, num, tag):
+      nonlocal b
+      b += f'(local.set $var_{typ}reg_{num}_tag (i32.const {tag}))\n'
+
+    def set_val_reg(typ, num, val):
+      nonlocal b
+      b += f'(local.set $var_{typ}reg_{num}_val (i32.const {val}))\n'
+
+    def set_const(typ, num, val, tag):
+      set_typ_reg(typ, num, tag)
+      set_val_reg(typ, num, val)
+
+    def move(styp, snum, dtyp, dnum):
+      push(styp, snum, 'tag')
+      pop(dtyp, dnum, 'tag')
+      push(styp, snum, 'val')
+      pop(dtyp, dnum, 'val')
+
     for statement in func.statements:
       styp = statement[0]
       sbody = statement[1]
       if styp == 'allocate':
         [yreg, xreg] = sbody
         max_yregs = max(max_yregs, int(yreg))
-        max_arity = max(max_arity, int(xreg))
+        max_xregs = max(max_xregs, int(xreg))
+
       if styp == 'trim':
         [nremove, nleft] = sbody
         nremove = int(nremove)
         nleft = int(nleft)
         for yreg in range(0, nleft):
-          b += f'local.get $var_yreg_{yreg + nremove}_tag\n'
-          b += f'local.set $var_yreg_{yreg}_tag\n'
-          b += f'local.get $var_yreg_{yreg + nremove}_val\n'
-          b += f'local.set $var_yreg_{yreg}_val\n'
+          move('y', yreg + nremove, 'y', yreg)
 
       if styp == 'move':
         [(styp, [sval]), (dtyp, [dval])] = sbody
+        dval = int(dval)
+
         if styp == 'integer':
-          b += f'(local.set $var_{dtyp}reg_{dval}_tag (i32.const 0))\n'
-          b += f'(local.set $var_{dtyp}reg_{dval}_val (i32.const {sval}))\n'
+          set_const(dtyp, dval, sval, 0)
         elif styp == 'literal':
-          b += f'(local.set $var_{dtyp}reg_{dval}_tag (i32.const 10))\n'
-          b += f'(local.set $var_{dtyp}reg_{dval}_val (i32.const {literalidx}))\n'
-          literalidx += 4
-          literalidx += len(sval)
+          mem_offset = add_literal(sval)
+          set_const(dtyp, dval, mem_offset, 10)
         elif styp == 'x' or styp == 'y':
-          b += f'local.get $var_{styp}reg_{sval}_tag\n'
-          b += f'local.set $var_{dtyp}reg_{dval}_tag\n'
-          b += f'local.get $var_{styp}reg_{sval}_val\n'
-          b += f'local.set $var_{dtyp}reg_{dval}_val\n'
-
-        if styp == 'x':
-          max_arity = max(max_arity, int(sval) + 1)
-        if dtyp == 'x':
-          max_arity = max(max_arity, int(dval) + 1)
-
+          sval = int(sval)
+          move(styp, sval, dtyp, dval)
         else:
           continue
 
       if styp == 'call_ext':
         [ext_mod, ext_fn, ext_fn_arity] = statement[1][1][1]
-        max_arity = max(max_arity, int(ext_fn_arity))
+        add_import(ext_mod, ext_fn, ext_fn_arity)
+        max_xregs = max(max_xregs, int(ext_fn_arity))
 
         for xreg in range(0, int(ext_fn_arity)):
-          b += f'local.get $var_xreg_{xreg}_tag\n'
-          b += f'local.get $var_xreg_{xreg}_val\n'
+          push('x', xreg, 'tag')
+          push('x', xreg, 'val')
 
         b += f'call ${ext_mod}_{ext_fn}_{ext_fn_arity}\n'
-        b += f'local.set $var_xreg_0_val\n'
-        b += f'local.set $var_xreg_0_tag\n'
-
-        assert stack >= 0, f"Stack shold grow {stack}"
+        pop('x', 0, 'val')
+        pop('x', 0, 'tag')
 
       if styp == 'call_only':
         [arity, (_f, [findex])] = sbody
         arity = int(arity)
+        max_xregs = max(max_xregs, arity)
         findex = int(findex)
         into_func = module.find_function(findex)
 
         for xreg in range(0, arity):
-          b += f'local.get $var_xreg_{xreg}_tag\n'
-          b += f'local.get $var_xreg_{xreg}_val\n'
+          push('x', xreg, 'tag')
+          push('x', xreg, 'val')
 
         b += f'call ${into_func.name}_{into_func.arity}\n'
-        b += f'local.set $var_xreg_0_val\n'
-        b += f'local.set $var_xreg_0_tag\n'
+        pop('x', 0, 'val')
+        pop('x', 0, 'tag')
 
-        max_arity = max(max_arity, arity)
 
       if styp == 'gc_bif':
         [op, _fall, arity, [arg0, arg1], ret] = sbody
@@ -200,25 +226,26 @@ def produce_wasm(module):
         (retT, [retV]) = ret
 
         if arg0t == 'x' or arg0t == 'y':
-          b += f'local.get $var_{arg0t}reg_{arg0v}_val\n'
+          push(arg0t, int(arg0v), 'val')
         if arg1t == 'x' or arg1t == 'y':
-          b += f'local.get $var_{arg1t}reg_{arg1v}_val\n'
+          push(arg1t, int(arg1v), 'val')
 
         if op == "'+'":
           b += 'i32.add\n'
 
         if retT == 'x' or retT == 'y':
-          b += f'local.set $var_{retT}reg_{retV}_val\n'
-          b += f'(local.set $var_{retT}reg_{retV}_tag (i32.const 0))\n'
-    while stack > 0:
-      stack -= 1
-      b += 'drop\n'
+          pop(retT, int(retV), 'val')
+          set_typ_reg(retT, retV, 0)
 
-    b += f'local.get $var_xreg_0_tag\n'
-    b += f'local.get $var_xreg_0_val\n'
-    stack = 2
+    assert stack == 0
 
-    for xreg in range(0, max_arity):
+    # Beam uses X0 as function result.
+    # Put return registers to stack.
+    push('x', 0, 'tag')
+    push('x', 0, 'val')
+
+    localvars = '\n'
+    for xreg in range(0, max_xregs):
       localvars += f'(local $var_xreg_{xreg}_tag i32)\n'
       localvars += f'(local $var_xreg_{xreg}_val i32)\n'
 
@@ -230,8 +257,13 @@ def produce_wasm(module):
       name=func.name,
       arity=func.arity,
       params=make_in_params_n(int(func.arity) * 2),
-      result=make_result_n(stack),
+      result=make_result_n(2),
       body=localvars + b
     )
 
-  return MODULE.format(name=module.name, imports="\n".join(imports), data=data, body=body)
+  return MODULE.format(
+    name=module.name,
+    imports="\n".join(imports),
+    data=data,
+    body=body
+  )
