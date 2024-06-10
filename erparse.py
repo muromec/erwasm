@@ -1,18 +1,36 @@
 from ermod import make_module
 
+
+def is_num(value):
+  return '0' <= value <= '9'
+
+def is_atom(value):
+  return 'a' <= value <= 'z' or value == '_'
+
 def parse_list_sentence_helper(text, State):
   ret = []
   state = None
+  acc = ''
   while State.idx < len(text):
     symbol = text[State.idx]
     State.idx += 1
-    if symbol == ']':
-      break
-    elif state == None and symbol == '{':
+
+    if state == None and symbol == '{':
       child_sentence = parse_sentence_helper(text, State)
       ret.append(child_sentence)
+    elif state == None and is_num(symbol):
+      state = 'num'
+      acc = symbol
+    elif state == 'num' and is_num(symbol):
+      acc += symbol
+    elif state == 'num' and not is_num(symbol):
+      ret.append(int(acc))
+      state = None
     elif state == None and symbol in ['[', '"']:
       assert False, 'cant be!'
+
+    if symbol == ']':
+      break
 
   return ret
 
