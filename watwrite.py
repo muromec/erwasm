@@ -72,6 +72,28 @@ def make_in_params_n(n):
     idx += 1
   return ret
 
+
+def pack_literal(value, push):
+  if isinstance(value, str):
+    return (value, 10)
+
+  if isinstance(value, int):
+    return (make_len(value), 7)
+
+  if isinstance(value, list) or isinstance(value, typle):
+    ret = [
+      push(element)
+      for element in value
+    ] + [[0, 0]]
+    packed_ret = [
+      make_len(off) + make_len(typ)
+      for off, typ in ret
+    ]
+    buffer = "".join(packed_ret)
+    return (buffer, 20)
+
+  assert False, f'cant pack as constant value {value}'
+
 def produce_wasm(module):
   body = ''
   data = ''
@@ -89,16 +111,17 @@ def produce_wasm(module):
   def add_literal(sval):
     nonlocal data
     nonlocal literalidx
+    (packed_value, packed_value_type) = pack_literal(sval, add_literal)
     mem_offset = literalidx
     data += LITERAL.format(
       offset0 = literalidx,
       offset1 = literalidx + 4,
-      llen = make_len(len(sval)),
-      lval = sval,
+      llen = make_len(len(packed_value)),
+      lval = packed_value,
     )
     literalidx += 4
-    literalidx += len(sval)
-    return mem_offset
+    literalidx += len(packed_value)
+    return (mem_offset, packed_value_type)
 
   literalidx = 4
   for func in module.functions:
@@ -185,8 +208,8 @@ def produce_wasm(module):
       if typ == 'integer':
         set_const(dtyp, reg_n, val, 0)
       elif typ == 'literal':
-        mem_offset = add_literal(val)
-        set_const(dtyp, reg_n, mem_offset, 10)
+        (mem_offset, literal_typ) = add_literal(val)
+        set_const(dtyp, reg_n, mem_offset, literal_typ)
       elif typ == 'atom':
         set_const(dtyp, reg_n, 0, 20) # TODO: implement atoms
       elif typ == 'x' or typ == 'y':
@@ -203,7 +226,7 @@ def produce_wasm(module):
       if typ == 'integer':
         b += f'(i32.const {val})\n'
       elif typ == 'literal':
-        mem_offset = add_literal(val)
+        (mem_offset, literal_typ) = add_literal(val)
         b += f'(i32.const {mem_offset})\n'
       elif typ == 'atom':
         b += f'(i32.const 0)\n' # TODO: implement atoms

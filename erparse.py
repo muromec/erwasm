@@ -26,7 +26,14 @@ def parse_list_sentence_helper(text, State):
     elif state == 'num' and not is_num(symbol):
       ret.append(int(acc))
       state = None
-    elif state == None and symbol in ['[', '"']:
+    elif state == None and symbol == '"':
+      state = 'str'
+      acc = ''
+    elif state == 'str' and symbol == '"':
+      ret.append(acc)
+    elif state == 'str' and symbol != '"':
+      acc += symbol
+    elif state == None and symbol in ['[']:
       assert False, 'cant be!'
 
     if symbol == ']':
