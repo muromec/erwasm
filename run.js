@@ -16,18 +16,47 @@ const wasi = new WASI({
     await readFile(join(__dirname, fname)),
   );
 
-  function get_string(offset) {
+  function readInt32(offset) {
     const bytes = new Uint8Array(instance.exports.memory.buffer);
     const len3 = bytes[offset];
     const len2 = bytes[offset + 1];
     const len1 = bytes[offset + 2];
     const len0 = bytes[offset + 3];
 
-    const len = (len0 | len1 << 8 | len2 << 16 | len3 << 24);
+    return (len0 | len1 << 8 | len2 << 16 | len3 << 24);
+  }
+
+  function writeInt32(offset, value) {
+    const bytes = new Uint8Array(instance.exports.memory.buffer);
+    bytes[offset] = (value >>> 24) & 0xFF;
+    bytes[offset + 1] = (value >>> 16) & 0xFF;
+    bytes[offset + 2] = (value >>> 8) & 0xFF;
+    bytes[offset + 3] = (value) & 0xFF;
+  }
+
+  function get_string(offset) {
+    const bytes = new Uint8Array(instance.exports.memory.buffer);
+    const len = readInt32(offset);
     const textBytes = bytes.slice(offset + 4, offset + 4 + len);
 
-    return new TextDecoder("utf8").decode(bytes.slice(offset + 4, offset + 4 + len));
+    return new TextDecoder("utf8").decode(
+      bytes.slice(offset + 4, offset + 4 + len)
+    );
   }
+
+  function write_string(value) {
+    const bytes = new Uint8Array(instance.exports.memory.buffer);
+    const offset = readInt32(0);
+    const encoder = new TextEncoder();
+    const value_bytes = encoder.encode(value);
+    for(let idx = 0; idx < bytes.length; idx++) {
+      bytes[idx + offset + 4] = value_bytes[idx];
+    }
+    writeInt32(offset, bytes.length);
+    writeInt32(0, offset + 4 + bytes.length);
+    return offset;
+  }
+
   function unpack(...args) {
     const ret = [];
     for(let idx = 0; idx < args.length ; idx += 2) {
@@ -45,8 +74,14 @@ const wasi = new WASI({
   function pack(...args) {
     const ret = [];
     for (let idx = 0; idx < args.length; idx += 1) {
-      ret.push(0);
-      ret.push(args[idx]);
+      let arg = args[idx];
+      if (typeof arg === 'number') {
+        ret.push(0);
+        ret.push(arg);
+      } else if (typeof arg === 'string') {
+        ret.push(10);
+        ret.push(write_string(arg));
+      }
     }
     return ret;
   }

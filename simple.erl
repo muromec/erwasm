@@ -1,6 +1,6 @@
 -module(simple).
 
--export([main/0, second/0, other/0, sum/2, sum/1, conditional/1, loop/1]).
+-export([main/0, second/0, other/0, sum/2, sum/1, conditional/1, loop/1, printStr/1]).
 
 main() ->
   console:log(1, 3, "Hi"),
@@ -44,3 +44,7 @@ loop(N) ->
       console:log("GotN", N),
       loop(N + 1)
   end.
+
+
+printStr(S) ->
+  console:log("S-N", S, 1).

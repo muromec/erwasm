@@ -27,6 +27,10 @@ LITERAL = '''
   (data (i32.const {offset0}) "{llen}")
   (data (i32.const {offset1}) "{lval}")
 '''
+MEM_NEXT_FREE = '''
+  ;; next free memory offset
+  (data (i32.const {offset0}) "{offset}")
+'''
 
 def pad(n):
   if len(n) == 1:
@@ -96,7 +100,7 @@ def produce_wasm(module):
     literalidx += len(sval)
     return mem_offset
 
-  literalidx = 0
+  literalidx = 4
   for func in module.functions:
     max_xregs = max(int(func.arity), 1)
     max_yregs = 0
@@ -238,17 +242,19 @@ def produce_wasm(module):
           inside_block = False
 
       if styp == 'test':
-        [op, _f, [arg0, arg1]] = sbody
+        print('test', sbody)
+        [op, _f, args] = sbody
         inside_block = True
         b += '(block \n'
-        populate_stack_with(arg0)
-        populate_stack_with(arg1)
+        for arg in args:
+          populate_stack_with(arg)
 
         b += {
           'is_lt': 'i32.lt_u\n',
           'is_le': 'i32.le_u\n',
           'is_gt': 'i32.gt_u\n',
           'is_ge': 'i32.ge_u\n',
+          'is_nonempty_list': '(i32.const 0)\ni32.eq\n'
         }[op]
 
         b += '(i32.const 0)\n'
@@ -270,6 +276,18 @@ def produce_wasm(module):
 
       if styp == 'call_ext_only':
         [ext_mod, ext_fn, ext_fn_arity] = statement[1][1][1]
+        add_import(ext_mod, ext_fn, ext_fn_arity)
+        max_xregs = max(max_xregs, int(ext_fn_arity))
+
+        for xreg in range(0, int(ext_fn_arity)):
+          push('x', xreg, 'tag')
+          push('x', xreg, 'val')
+
+        b += f'call ${ext_mod}_{ext_fn}_{ext_fn_arity}\n'
+        b += 'return';
+
+      if styp == 'call_ext_last':
+        [_arity, (_e, [ext_mod, ext_fn, ext_fn_arity]), _regs] = sbody
         add_import(ext_mod, ext_fn, ext_fn_arity)
         max_xregs = max(max_xregs, int(ext_fn_arity))
 
@@ -346,7 +364,10 @@ def produce_wasm(module):
       localvars=localvars,
       body=b,
     )
-
+  data = MEM_NEXT_FREE.format(
+    offset0=0,
+    offset=make_len(literalidx),
+  ) + data
   return MODULE.format(
     name=module.name,
     imports="\n".join(imports),
