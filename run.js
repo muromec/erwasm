@@ -18,20 +18,20 @@ const wasi = new WASI({
 
   function readInt32(offset) {
     const bytes = new Uint8Array(instance.exports.memory.buffer);
-    const len3 = bytes[offset];
-    const len2 = bytes[offset + 1];
-    const len1 = bytes[offset + 2];
-    const len0 = bytes[offset + 3];
+    const len0 = bytes[offset];
+    const len1 = bytes[offset + 1];
+    const len2 = bytes[offset + 2];
+    const len3 = bytes[offset + 3];
 
     return (len0 | len1 << 8 | len2 << 16 | len3 << 24);
   }
 
   function writeInt32(offset, value) {
     const bytes = new Uint8Array(instance.exports.memory.buffer);
-    bytes[offset] = (value >>> 24) & 0xFF;
-    bytes[offset + 1] = (value >>> 16) & 0xFF;
-    bytes[offset + 2] = (value >>> 8) & 0xFF;
-    bytes[offset + 3] = (value) & 0xFF;
+    bytes[offset + 3] = (value >>> 24) & 0xFF;
+    bytes[offset + 2] = (value >>> 16) & 0xFF;
+    bytes[offset + 1] = (value >>> 8) & 0xFF;
+    bytes[offset + 0] = (value) & 0xFF;
   }
 
   function get_string(offset) {
@@ -106,9 +106,9 @@ const wasi = new WASI({
     },
   };
   const instance = new WebAssembly.Instance(wasm, imports);
-  console.log('sum', call('sum', 1, 3));
-  console.log('conditional', call('conditional', 100));
-  console.log('loop', call('loop', 1));
+  console.log('main', call('main'));
+  // console.log('conditional', call('conditional', 100));
+  // console.log('loop', call('loop', 1));
 
 
 })();

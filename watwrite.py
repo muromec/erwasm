@@ -38,10 +38,10 @@ def pad(n):
   return n
 
 def make_len(n):
-  len0 = n & 0xFF
-  len1 = (n >> 8) & 0xFF
-  len2 = (n >> 16) & 0xFF
-  len3 = (n >> 24) & 0xFF
+  len3 = n & 0xFF
+  len2 = (n >> 8) & 0xFF
+  len1 = (n >> 16) & 0xFF
+  len0 = (n >> 24) & 0xFF
 
   len0s = pad(hex(len0)[2:])
   len1s = pad(hex(len1)[2:])
@@ -335,6 +335,21 @@ def produce_wasm(module):
         b += f'call ${into_func.name}_{into_func.arity}\n'
         b += 'return';
 
+      if styp == 'call':
+        [arity, (_f, [findex])] = sbody
+        arity = int(arity)
+        max_xregs = max(max_xregs, arity)
+        findex = int(findex)
+        into_func = module.find_function(findex)
+
+        for xreg in range(0, arity):
+          push('x', xreg, 'tag')
+          push('x', xreg, 'val')
+
+        b += f'call ${into_func.name}_{into_func.arity}\n'
+        pop('x', 0, 'val')
+        pop('x', 0, 'tag')
+
       if styp == 'call_last':
         [arity, (_f, [findex]), regs] = sbody
         arity = int(arity)
@@ -362,6 +377,28 @@ def produce_wasm(module):
         if retT == 'x' or retT == 'y':
           pop(retT, int(retV), 'val')
           set_typ_reg(retT, retV, 0)
+
+      if styp == 'get_hd':
+        [sarg, darg] = sbody
+        [styp, [snum]] = sarg
+        snum = int(snum)
+        [dtyp, [dnum]] = darg
+        dnum = int(dnum)
+
+        # set_val_reg(dtyp, dnum, 3)
+        push(styp, snum, 'val')
+        push(styp, snum, 'val')
+        b += 'i32.const 4\n'
+        b += 'i32.add\n'
+        b += 'i32.load\n'
+        pop(dtyp, dnum, 'val')
+
+        b += 'i32.const 8\n'
+        b += 'i32.add\n'
+        b += 'i32.load\n'
+        pop(dtyp, dnum, 'tag')
+
+      # print('s', styp)
 
     assert stack == 0
 
