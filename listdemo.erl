@@ -1,10 +1,12 @@
 -module(listdemo).
 
-% -export([main/0, other/0]).
 -export([main/0]).
 
 first([L|_X]) -> L.
 
+second([_H|Tail]) -> first(Tail).
+
 main() ->
-  N = first(["X"]),
-  console:log("Y", N).
+  A = first([1,2]),
+  B = second([3,4]),
+  console:log("Y", A + B).

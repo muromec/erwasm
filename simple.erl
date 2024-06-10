@@ -28,7 +28,7 @@ sum(A) ->
 conditional(N) ->
   if
    N > 100 -> "big";
-   true -> "other"
+   true -> "smol"
   end.
   
 

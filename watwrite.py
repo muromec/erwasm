@@ -1,3 +1,4 @@
+from codecs import decode
 MODULE = '''(module
    ;; module name: {name}
    {imports}
@@ -48,7 +49,8 @@ def make_len(n):
   len2s = pad(hex(len2)[2:])
   len3s = pad(hex(len3)[2:])
 
-  return f'\\{len3s}\\{len2s}\\{len1s}\\{len0s}'
+  ret = f'\\{len3s}\\{len2s}\\{len1s}\\{len0s}'
+  return ret
 
 def make_result_n(n):
   if n == 0:
@@ -72,22 +74,33 @@ def make_in_params_n(n):
     idx += 1
   return ret
 
+def fix_string(value):
+  value = decode(value, 'unicode-escape')
+  ret = ''
+  for symbol in value:
+    s = pad(hex(ord(symbol))[2:])
+    ret += f'\\{s}'
+
+  return ret
 
 def pack_literal(value, push):
   if isinstance(value, str):
-    return (value, 10)
+    return (fix_string(value), 10)
 
   if isinstance(value, int):
-    return (make_len(value), 7)
+    return (make_len(value), 0)
 
   if isinstance(value, list) or isinstance(value, typle):
+    n_items = len(value)
     ret = [
       push(element)
       for element in value
     ] + [[0, 0]]
     packed_ret = [
-      make_len(off) + make_len(typ)
-      for off, typ in ret
+      make_len(off) +
+      make_len(typ) +
+      make_len((n_items - 1 - idx) * 3)
+      for idx, (off, typ) in enumerate(ret)
     ]
     buffer = "".join(packed_ret)
     return (buffer, 20)
@@ -174,6 +187,22 @@ def produce_wasm(module):
 
       b += f'local.set $var_{typ}reg_{num}_{part}\n'
 
+    def load_if_int(dtyp, dnum):
+      nonlocal b
+      push(dtyp, dnum, 'tag')
+      b += f'''
+      (if
+         (then nop)
+         (else
+          local.get $var_{dtyp}reg_{dnum}_val
+          i32.const 4
+          i32.add
+          i32.load
+          local.set $var_{dtyp}reg_{dnum}_val
+         )
+      )
+      '''
+
     def set_typ_reg(typ, num, tag):
       nonlocal b
       b += f'(local.set $var_{typ}reg_{num}_tag (i32.const {tag}))\n'
@@ -187,6 +216,8 @@ def produce_wasm(module):
       set_val_reg(typ, num, val)
 
     def move(styp, snum, dtyp, dnum):
+      nonlocal b
+      b += f';; move {styp}{snum} -> {dtyp}{dnum} \n'
       push(styp, snum, 'tag')
       pop(dtyp, dnum, 'tag')
       push(styp, snum, 'val')
@@ -235,7 +266,18 @@ def produce_wasm(module):
       else:
         assert False, 'not implemented {typ}'.format(typ=typ)
 
-    inside_block = False
+    depth = 0
+    labels = list([
+      statement[1][0]
+      for statement in func.statements
+      if statement[0] == 'label'
+    ])
+
+    labels.pop(0)
+    while labels:
+      label = labels.pop()
+      b += f'(block $label_{label} \n'
+
     for statement in func.statements:
       styp = statement[0]
       sbody = statement[1]
@@ -260,29 +302,29 @@ def produce_wasm(module):
         populate_with(dtyp, dval, source)
 
       if styp == 'label':
-        if inside_block:
-          b += ') ;; end of block\n'
-          inside_block = False
+        b += f';; label {sbody[0]}, deep {depth}\n'
+        if depth > 0:
+          b += f') ;; end of depth {depth}\n'
+
+        depth += 1
 
       if styp == 'test':
-        print('test', sbody)
-        [op, _f, args] = sbody
-        inside_block = True
-        b += '(block \n'
+        [op, (_f, [jump]), args] = sbody
         for arg in args:
           populate_stack_with(arg)
 
+        b += f' ;; test and jump to {jump}\n'
         b += {
           'is_lt': 'i32.lt_u\n',
           'is_le': 'i32.le_u\n',
           'is_gt': 'i32.gt_u\n',
           'is_ge': 'i32.ge_u\n',
-          'is_nonempty_list': '(i32.const 0)\ni32.eq\n'
+          'is_nonempty_list': 'i32.load\n'
         }[op]
 
         b += '(i32.const 0)\n'
         b += '(i32.eq)\n'
-        b += '(br_if 0)\n'
+        b += f'(br_if $label_{jump})\n'
 
       if styp == 'call_ext':
         [ext_mod, ext_fn, ext_fn_arity] = statement[1][1][1]
@@ -379,6 +421,8 @@ def produce_wasm(module):
           set_typ_reg(retT, retV, 0)
 
       if styp == 'get_hd':
+        b += ';; get_hd\n'
+
         [sarg, darg] = sbody
         [styp, [snum]] = sarg
         snum = int(snum)
@@ -397,14 +441,25 @@ def produce_wasm(module):
         b += 'i32.add\n'
         b += 'i32.load\n'
         pop(dtyp, dnum, 'tag')
+        load_if_int(dtyp, dnum)
+
+      if styp == 'get_tl':
+        b += ';; get_tl\n'
+        [sarg, darg] = sbody
+        [styp, [snum]] = sarg
+        snum = int(snum)
+        [dtyp, [dnum]] = darg
+        dnum = int(dnum)
+
+        push(styp, snum, 'val')
+        b += 'i32.const 12\n'
+        b += 'i32.add\n'
+        pop(dtyp, dnum, 'val')
+        set_typ_reg(dtyp, dnum, 20)
 
       # print('s', styp)
 
     assert stack == 0
-
-    if inside_block:
-      b += ') ;; end of last block\n'
-      b += 'unreachable\n'
 
     localvars = '\n'
     for xreg in range(0, max_xregs):
