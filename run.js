@@ -73,6 +73,7 @@ const wasi = new WASI({
   const instance = new WebAssembly.Instance(wasm, imports);
   console.log('sum', call('sum', 1, 3));
   console.log('conditional', call('conditional', 100));
+  console.log('loop', call('loop', 1));
 
 
 })();

@@ -47,7 +47,7 @@ def parse_sentence_helper(text, State):
     elif state == None and symbol == '{':
       child_sentence = parse_sentence_helper(text, State)
       children.append(child_sentence)
-    elif state == None:
+    elif state == None and symbol not in [' ', '\n']:
       state = 'arg_name'
       arg_name = symbol
     elif state == 'arg_name' and symbol in [' ', ',']:

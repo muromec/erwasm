@@ -192,6 +192,8 @@ def produce_wasm(module):
         assert False, 'not implemented {typ}'.format(typ=typ)
 
     def populate_stack_with(value):
+      if value[0] == 'tr':
+        value = value[1][0]
       [typ, [val]] = value
       nonlocal b
       if typ == 'integer':
@@ -242,10 +244,12 @@ def produce_wasm(module):
         populate_stack_with(arg0)
         populate_stack_with(arg1)
 
-        if op == 'is_lt':
-          b += 'i32.lt_u\n'
-        else:
-          assert False, f'Not implemented {op}'
+        b += {
+          'is_lt': 'i32.lt_u\n',
+          'is_le': 'i32.le_u\n',
+          'is_gt': 'i32.gt_u\n',
+          'is_ge': 'i32.ge_u\n',
+        }[op]
 
         b += '(i32.const 0)\n'
         b += '(i32.eq)\n'
@@ -274,6 +278,7 @@ def produce_wasm(module):
           push('x', xreg, 'val')
 
         b += f'call ${ext_mod}_{ext_fn}_{ext_fn_arity}\n'
+        b += 'return';
 
       if styp == 'call_only':
         [arity, (_f, [findex])] = sbody
@@ -287,6 +292,21 @@ def produce_wasm(module):
           push('x', xreg, 'val')
 
         b += f'call ${into_func.name}_{into_func.arity}\n'
+        b += 'return';
+
+      if styp == 'call_last':
+        [arity, (_f, [findex]), regs] = sbody
+        arity = int(arity)
+        max_xregs = max(max_xregs, arity)
+        findex = int(findex)
+        into_func = module.find_function(findex)
+
+        for xreg in range(0, arity):
+          push('x', xreg, 'tag')
+          push('x', xreg, 'val')
+
+        b += f'call ${into_func.name}_{into_func.arity}\n'
+        b += 'return';
 
       if styp == 'gc_bif':
         [op, _fall, arity, [arg0, arg1], ret] = sbody
