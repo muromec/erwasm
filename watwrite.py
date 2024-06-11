@@ -272,17 +272,29 @@ def produce_wasm(module):
       for statement in func.statements
       if statement[0] == 'label'
     ])
+    labels_to_idx = labels[:]
+    jump_depth = labels_to_idx.index(str(func.start_label))
 
-    labels.pop(0)
+    b += f'(local.set $jump (i32.const {jump_depth}))\n'
+    labels0 = list(map(str,range(0, len(labels))))
+    labels0 = " ".join(labels0[:])
+    b += f'(loop $start\n'
     while labels:
       label = labels.pop()
       b += f'(block $label_{label} \n'
 
+    b += f'(br_table  {labels0} (local.get $jump))\n'
+    b += f'unreachable\n'
+
+    current_label = None
     for statement in func.statements:
       styp = statement[0]
       sbody = statement[1]
       if styp == 'return':
         push_return()
+
+      if styp == 'func_info':
+        b += 'unreachable ;; func info trap\n'
 
       if styp == 'allocate':
         [yreg, xreg] = sbody
@@ -303,8 +315,7 @@ def produce_wasm(module):
 
       if styp == 'label':
         b += f';; label {sbody[0]}, deep {depth}\n'
-        if depth > 0:
-          b += f') ;; end of depth {depth}\n'
+        b += f') ;; end of depth {depth}\n'
 
         depth += 1
 
@@ -324,7 +335,9 @@ def produce_wasm(module):
 
         b += '(i32.const 0)\n'
         b += '(i32.eq)\n'
-        b += f'(br_if $label_{jump})\n'
+        jump_depth = labels_to_idx.index(jump)
+        b += f'(local.set $jump (i32.const {jump_depth}))\n'
+        b += f'(br_if $start)\n'
 
       if styp == 'call_ext':
         [ext_mod, ext_fn, ext_fn_arity] = statement[1][1][1]
@@ -459,6 +472,8 @@ def produce_wasm(module):
 
       # print('s', styp)
 
+    b += ') ;; end of loop\n'
+    b += 'unreachable\n';
     assert stack == 0
 
     localvars = '\n'
@@ -469,6 +484,8 @@ def produce_wasm(module):
     for yreg in range(0, max_yregs):
       localvars += f'(local $var_yreg_{yreg}_tag i32)\n'
       localvars += f'(local $var_yreg_{yreg}_val i32)\n'
+
+    localvars += f'(local $jump i32)\n'
 
     body += FUNC.format(
       name=func.name,
