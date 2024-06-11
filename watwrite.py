@@ -203,6 +203,21 @@ def produce_wasm(module):
       )
       '''
 
+    def assert_tag_type(typ, num, expect_tag):
+      nonlocal b
+      # assert that source value is a list
+      b += f'''
+      ;; break out if {typ}{num} is not {expect_tag}
+      (block
+        (local.get $var_{typ}reg_{num}_tag)
+        (i32.eq (i32.const {expect_tag}))
+        (if
+          (then nop)
+          (else unreachable
+          )
+        )
+      )\n'''
+
     def set_typ_reg(typ, num, tag):
       nonlocal b
       b += f'(local.set $var_{typ}reg_{num}_tag (i32.const {tag}))\n'
@@ -434,6 +449,7 @@ def produce_wasm(module):
           set_typ_reg(retT, retV, 0)
 
       if styp == 'get_hd':
+        b += '(block ;; get_hd\n'
         b += ';; get_hd\n'
 
         [sarg, darg] = sbody
@@ -441,6 +457,28 @@ def produce_wasm(module):
         snum = int(snum)
         [dtyp, [dnum]] = darg
         dnum = int(dnum)
+
+        # if its a string
+        b += f'''
+        (block
+          (local.get $var_{styp}reg_{snum}_tag)
+          (i32.eq (i32.const 10))
+          (if
+            (then
+              (local.get $var_{styp}reg_{snum}_val)
+              (i32.add (i32.const 4))
+              (i32.load)
+              (i32.const 0xff)
+              (i32.and)
+              (local.set $var_{dtyp}reg_{dnum}_val)
+              (local.set $var_{dtyp}reg_{dnum}_tag (i32.const 0))
+              br 2
+            )
+          )
+        )\n'''
+
+        # assert that source value is a list
+        assert_tag_type(styp, snum, 20)
 
         # set_val_reg(dtyp, dnum, 3)
         push(styp, snum, 'val')
@@ -456,19 +494,45 @@ def produce_wasm(module):
         pop(dtyp, dnum, 'tag')
         load_if_int(dtyp, dnum)
 
+        b += ') ;; end get_hd\n'
+
       if styp == 'get_tl':
+        b += '(block ;; get_tl\n'
         b += ';; get_tl\n'
+
         [sarg, darg] = sbody
         [styp, [snum]] = sarg
         snum = int(snum)
         [dtyp, [dnum]] = darg
         dnum = int(dnum)
 
+        # if its a string
+        b += f'''
+        (block
+          (local.get $var_{styp}reg_{snum}_tag)
+          (i32.eq (i32.const 10))
+          (if
+            (then
+              (local.get $var_{styp}reg_{snum}_tag)
+              (local.get $var_{styp}reg_{snum}_val)
+              (i32.add (i32.const 1))
+              (local.set $var_{dtyp}reg_{dnum}_val)
+              (local.set $var_{dtyp}reg_{dnum}_tag)
+              br 2
+            )
+          )
+        )\n'''
+
+        # assert that source value is a list
+        assert_tag_type(styp, snum, 20)
+
         push(styp, snum, 'val')
         b += 'i32.const 12\n'
         b += 'i32.add\n'
         pop(dtyp, dnum, 'val')
         set_typ_reg(dtyp, dnum, 20)
+
+        b += ') ;; end get_tl\n'
 
       # print('s', styp)
 
