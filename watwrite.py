@@ -518,10 +518,10 @@ def produce_wasm(module):
               (i32.add (i32.const 1))
               (local.set $var_{dtyp}reg_{dnum}_val)
               (local.set $var_{dtyp}reg_{dnum}_tag)
-              br 2
+              br 2 ;; $2 out of the block early
             )
-          )
-        )\n'''
+          ) ;; $0
+        ) ;; $1\n'''
 
         # assert that source value is a list
         assert_tag_type(styp, snum, 20)
@@ -532,7 +532,7 @@ def produce_wasm(module):
         pop(dtyp, dnum, 'val')
         set_typ_reg(dtyp, dnum, 20)
 
-        b += ') ;; end get_tl\n'
+        b += ') ;; $2 end get_tl\n'
 
       # print('s', styp)
 
