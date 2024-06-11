@@ -1,11 +1,14 @@
 -module(simple).
 
--export([main/0, second/0, other/0, sum/2, sum/1, conditional/1, loop/1, printStr/1]).
+-export([main/0, second/0, other/0, sum/2, sum/1, conditional/1, loop/1, printStr/1, n/1]).
 
 main() ->
   console:log(1, 3, "Hi"),
   1 + 1.
 
+n(N) ->
+  console:log(N),
+  N + 15.
 
 second() ->
   "X-Name".

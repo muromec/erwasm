@@ -21,12 +21,11 @@ FUNC_EXPORT = '''
 '''
 
 FUNC_IMPORT = '''
-(import "{mod}" "{fn}" (func ${mod}_{fn}_{arity} {params} (result i32 i32)))
+(import "{mod}" "{fn}" (func ${mod}_{fn}_{arity} {params} (result i32)))
 '''
 
 LITERAL = '''
-  (data (i32.const {offset0}) "{llen}")
-  (data (i32.const {offset1}) "{lval}")
+  (data (i32.const {offset}) "{value}")
 '''
 MEM_NEXT_FREE = '''
   ;; next free memory offset
@@ -75,17 +74,20 @@ def make_in_params_n(n):
   return ret
 
 def fix_string(value):
-  value = decode(value, 'unicode-escape')
-  ret = ''
-  for symbol in value:
-    s = pad(hex(ord(symbol))[2:])
-    ret += f'\\{s}'
+  return  decode(value, 'unicode-escape')
 
-  return ret
-
-def pack_literal(value, push):
+def pack_literal(value, offset, push):
   if isinstance(value, str):
-    return (fix_string(value), 10)
+    ret = ''
+    for int_value in map(ord, fix_string(value)):
+      offset += 8
+      ret += make_len(offset << 2 | 1)
+      ret += make_len(int_value << 4 | 0xF)
+
+    ret += make_len(0x3b)
+    ret += make_len(0)
+
+    return ret
 
   if isinstance(value, int):
     return (make_len(value), 0)
@@ -116,7 +118,7 @@ def produce_wasm(module):
     import_line = FUNC_IMPORT.format(
       mod=ext_mod, fn=ext_fn,
       arity=int(ext_fn_arity),
-      params = make_params_n(int(ext_fn_arity) * 2),
+      params = make_params_n(int(ext_fn_arity)),
     )
     if import_line not in imports:
       imports.append(import_line)
@@ -124,17 +126,14 @@ def produce_wasm(module):
   def add_literal(sval):
     nonlocal data
     nonlocal literalidx
-    (packed_value, packed_value_type) = pack_literal(sval, add_literal)
-    mem_offset = literalidx
+    packed_value = pack_literal(sval, literalidx, add_literal)
     data += LITERAL.format(
-      offset0 = literalidx,
-      offset1 = literalidx + 4,
-      llen = make_len(len(packed_value)),
-      lval = packed_value,
+      offset = literalidx,
+      value = packed_value,
     )
-    literalidx += 4
+    ret = literalidx + 0
     literalidx += len(packed_value)
-    return (mem_offset, packed_value_type)
+    return ret
 
   literalidx = 4
   for func in module.functions:
@@ -147,23 +146,16 @@ def produce_wasm(module):
 
     stack = 0
     arg = int(func.arity)
-    reg = (arg * 2) - 1
     while arg > 0:
-      b += f'local.get $in_{reg}\n'
+      b += f'local.get $in_{arg - 1}\n'
       b += f'local.set $var_xreg_{arg - 1}_val\n'
-      reg -= 1
-
-      b += f'local.get $in_{reg}\n'
-      b += f'local.set $var_xreg_{arg - 1}_tag\n'
-      reg -= 1
-
       arg -= 1
 
     b += f';; arity {func.arity}, input put into X registers\n'
 
     def push(typ, num, part):
       nonlocal b
-      assert part in ['val', 'tag']
+      assert part == 'val'
       assert typ in ['x', 'y']
       if typ == 'x':
         assert num <= max_xregs
@@ -177,7 +169,7 @@ def produce_wasm(module):
       nonlocal max_xregs
       nonlocal max_yregs
 
-      assert part in ['val', 'tag']
+      assert part == 'val'
       assert typ in ['x', 'y']
 
       if typ == 'x':
@@ -189,7 +181,7 @@ def produce_wasm(module):
 
     def load_if_int(dtyp, dnum):
       nonlocal b
-      push(dtyp, dnum, 'tag')
+      # push(dtyp, dnum, 'tag')
       b += f'''
       (if
          (then nop)
@@ -203,38 +195,19 @@ def produce_wasm(module):
       )
       '''
 
-    def assert_tag_type(typ, num, expect_tag):
-      nonlocal b
-      # assert that source value is a list
-      b += f'''
-      ;; break out if {typ}{num} is not {expect_tag}
-      (block
-        (local.get $var_{typ}reg_{num}_tag)
-        (i32.eq (i32.const {expect_tag}))
-        (if
-          (then nop)
-          (else unreachable
-          )
-        )
-      )\n'''
-
-    def set_typ_reg(typ, num, tag):
-      nonlocal b
-      b += f'(local.set $var_{typ}reg_{num}_tag (i32.const {tag}))\n'
-
     def set_val_reg(typ, num, val):
       nonlocal b
       b += f'(local.set $var_{typ}reg_{num}_val (i32.const {val}))\n'
 
-    def set_const(typ, num, val, tag):
-      set_typ_reg(typ, num, tag)
+    def set_const(typ, num, val):
+      #set_typ_reg(typ, num, tag)
       set_val_reg(typ, num, val)
 
     def move(styp, snum, dtyp, dnum):
       nonlocal b
       b += f';; move {styp}{snum} -> {dtyp}{dnum} \n'
-      push(styp, snum, 'tag')
-      pop(dtyp, dnum, 'tag')
+      # push(styp, snum, 'tag')
+      # pop(dtyp, dnum, 'tag')
       push(styp, snum, 'val')
       pop(dtyp, dnum, 'val')
 
@@ -244,7 +217,7 @@ def produce_wasm(module):
 
       # Beam uses X0 as function result.
       # Put return registers to stack.
-      push('x', 0, 'tag')
+      # push('x', 0, 'tag')
       push('x', 0, 'val')
       b += 'return\n'
 
@@ -252,12 +225,13 @@ def produce_wasm(module):
     def populate_with(dtyp, reg_n, value):
       [typ, [val]] = value
       if typ == 'integer':
-        set_const(dtyp, reg_n, val, 0)
+        set_const(dtyp, reg_n, (int(val) << 4) | 0xF)
       elif typ == 'literal':
-        (mem_offset, literal_typ) = add_literal(val)
-        set_const(dtyp, reg_n, mem_offset, literal_typ)
+        mem_offset = add_literal(val)
+        set_const(dtyp, reg_n, (int(mem_offset) << 2) | 0b10)
       elif typ == 'atom':
-        set_const(dtyp, reg_n, 0, 20) # TODO: implement atoms
+        # set_const(dtyp, reg_n, 0, 20) # TODO: implement atoms
+        pass
       elif typ == 'x' or typ == 'y':
         val = int(val)
         move(typ, val, dtyp, reg_n)
@@ -270,9 +244,10 @@ def produce_wasm(module):
       [typ, [val]] = value
       nonlocal b
       if typ == 'integer':
+        val = (int(val) << 4 | 0xF)
         b += f'(i32.const {val})\n'
       elif typ == 'literal':
-        (mem_offset, literal_typ) = add_literal(val)
+        mem_offset = add_literal(val)
         b += f'(i32.const {mem_offset})\n'
       elif typ == 'atom':
         b += f'(i32.const 0)\n' # TODO: implement atoms
@@ -360,12 +335,12 @@ def produce_wasm(module):
         max_xregs = max(max_xregs, int(ext_fn_arity))
 
         for xreg in range(0, int(ext_fn_arity)):
-          push('x', xreg, 'tag')
+          # push('x', xreg, 'tag')
           push('x', xreg, 'val')
 
         b += f'call ${ext_mod}_{ext_fn}_{ext_fn_arity}\n'
         pop('x', 0, 'val')
-        pop('x', 0, 'tag')
+        # pop('x', 0, 'tag')
 
       if styp == 'call_ext_only':
         [ext_mod, ext_fn, ext_fn_arity] = statement[1][1][1]
@@ -373,7 +348,7 @@ def produce_wasm(module):
         max_xregs = max(max_xregs, int(ext_fn_arity))
 
         for xreg in range(0, int(ext_fn_arity)):
-          push('x', xreg, 'tag')
+          # push('x', xreg, 'tag')
           push('x', xreg, 'val')
 
         b += f'call ${ext_mod}_{ext_fn}_{ext_fn_arity}\n'
@@ -385,7 +360,7 @@ def produce_wasm(module):
         max_xregs = max(max_xregs, int(ext_fn_arity))
 
         for xreg in range(0, int(ext_fn_arity)):
-          push('x', xreg, 'tag')
+          # push('x', xreg, 'tag')
           push('x', xreg, 'val')
 
         b += f'call ${ext_mod}_{ext_fn}_{ext_fn_arity}\n'
@@ -399,7 +374,7 @@ def produce_wasm(module):
         into_func = module.find_function(findex)
 
         for xreg in range(0, arity):
-          push('x', xreg, 'tag')
+          # push('x', xreg, 'tag')
           push('x', xreg, 'val')
 
         b += f'call ${into_func.name}_{into_func.arity}\n'
@@ -413,12 +388,12 @@ def produce_wasm(module):
         into_func = module.find_function(findex)
 
         for xreg in range(0, arity):
-          push('x', xreg, 'tag')
+          # push('x', xreg, 'tag')
           push('x', xreg, 'val')
 
         b += f'call ${into_func.name}_{into_func.arity}\n'
         pop('x', 0, 'val')
-        pop('x', 0, 'tag')
+        # pop('x', 0, 'tag')
 
       if styp == 'call_last':
         [arity, (_f, [findex]), regs] = sbody
@@ -428,7 +403,7 @@ def produce_wasm(module):
         into_func = module.find_function(findex)
 
         for xreg in range(0, arity):
-          push('x', xreg, 'tag')
+          # push('x', xreg, 'tag')
           push('x', xreg, 'val')
 
         b += f'call ${into_func.name}_{into_func.arity}\n'
@@ -442,11 +417,11 @@ def produce_wasm(module):
         populate_stack_with(arg1)
 
         if op == "'+'":
+          b += '(i32.xor (i32.const 0xF))\n'
           b += 'i32.add\n'
 
         if retT == 'x' or retT == 'y':
           pop(retT, int(retV), 'val')
-          set_typ_reg(retT, retV, 0)
 
       if styp == 'get_hd':
         b += '(block ;; get_hd\n'
@@ -459,7 +434,7 @@ def produce_wasm(module):
         dnum = int(dnum)
 
         # if its a string
-        b += f'''
+        f'''
         (block
           (local.get $var_{styp}reg_{snum}_tag)
           (i32.eq (i32.const 10))
@@ -477,9 +452,6 @@ def produce_wasm(module):
           )
         )\n'''
 
-        # assert that source value is a list
-        assert_tag_type(styp, snum, 20)
-
         # set_val_reg(dtyp, dnum, 3)
         push(styp, snum, 'val')
         push(styp, snum, 'val')
@@ -488,10 +460,13 @@ def produce_wasm(module):
         b += 'i32.load\n'
         pop(dtyp, dnum, 'val')
 
+        """
         b += 'i32.const 8\n'
         b += 'i32.add\n'
         b += 'i32.load\n'
         pop(dtyp, dnum, 'tag')
+        """
+
         load_if_int(dtyp, dnum)
 
         b += ') ;; end get_hd\n'
@@ -507,7 +482,7 @@ def produce_wasm(module):
         dnum = int(dnum)
 
         # if its a string
-        b += f'''
+        f'''
         (block
           (local.get $var_{styp}reg_{snum}_tag)
           (i32.eq (i32.const 10))
@@ -522,9 +497,6 @@ def produce_wasm(module):
             )
           ) ;; $0
         ) ;; $1\n'''
-
-        # assert that source value is a list
-        assert_tag_type(styp, snum, 20)
 
         push(styp, snum, 'val')
         b += 'i32.const 12\n'
@@ -542,21 +514,20 @@ def produce_wasm(module):
 
     localvars = '\n'
     for xreg in range(0, max_xregs):
-      localvars += f'(local $var_xreg_{xreg}_tag i32)\n'
       localvars += f'(local $var_xreg_{xreg}_val i32)\n'
 
     for yreg in range(0, max_yregs):
-      localvars += f'(local $var_yreg_{yreg}_tag i32)\n'
       localvars += f'(local $var_yreg_{yreg}_val i32)\n'
 
+    localvars += f'(local $temp i32)\n'
     localvars += f'(local $jump i32)\n'
 
     body += FUNC.format(
       name=func.name,
       arity=func.arity,
       start_label=func.start_label,
-      params=make_in_params_n(int(func.arity) * 2),
-      result=make_result_n(2),
+      params=make_in_params_n(int(func.arity)),
+      result=make_result_n(1),
       localvars=localvars,
       body=b,
     )

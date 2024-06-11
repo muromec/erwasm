@@ -26,76 +26,114 @@ const wasi = new WASI({
     return (len0 | len1 << 8 | len2 << 16 | len3 << 24);
   }
 
-  function writeInt32(offset, value) {
-    const bytes = new Uint8Array(instance.exports.memory.buffer);
+  function writeInt32(bytes, offset, value) {
     bytes[offset + 3] = (value >>> 24) & 0xFF;
     bytes[offset + 2] = (value >>> 16) & 0xFF;
     bytes[offset + 1] = (value >>> 8) & 0xFF;
     bytes[offset + 0] = (value) & 0xFF;
   }
 
-  function get_string(offset) {
-    const bytes = new Uint8Array(instance.exports.memory.buffer);
-    const len = readInt32(offset);
-    const textBytes = bytes.slice(offset + 4, offset + 4 + len);
+  function decode_string(list) {
+    const bytes = new Uint8Array(list);
+    const ret = new TextDecoder("utf8").decode(bytes);
+    return ret;
+  }
 
-    return new TextDecoder("utf8").decode(
-      bytes.slice(offset + 4, offset + 4 + len)
-    );
+  function maybe_string(value) {
+    if (!Array.isArray(value)) {
+      return value;
+    }
+    if (value.every((element) => (typeof element === 'number') && element >= 0x21 && element <= 126)) {
+      return decode_string(value);
+    }
+    return value
   }
 
   function write_string(value) {
     const bytes = new Uint8Array(instance.exports.memory.buffer);
-    const offset = readInt32(0);
+    let offset = readInt32(0);
+    const ret = offset;
     const encoder = new TextEncoder();
     const value_bytes = encoder.encode(value);
-    for(let idx = 0; idx < bytes.length; idx++) {
-      bytes[idx + offset + 4] = value_bytes[idx];
+    for(let idx = 0; idx < value_bytes.length; idx += 1) {
+      writeInt32(bytes, offset, tag2((offset + 8), 0b01));
+      writeInt32(bytes, offset + 4, tagF(value_bytes[idx]));
+      offset += 8;
     }
-    writeInt32(offset, bytes.length);
-    writeInt32(0, offset + 4 + bytes.length);
-    return offset;
+    writeInt32(bytes, offset, 0x3b);
+    writeInt32(bytes, offset + 4, 0);
+    writeInt32(bytes, 0, offset + 8);
+
+    // console.log('got ret', ret, offset);
+    return ret;
+  }
+
+  function readList(offset, acc) {
+    const tail = readInt32(offset);
+    const value = readInt32(offset + 4);
+
+    if (tail === 0x3b) {
+      return acc;
+    }
+    return readList(tail >> 2, [...acc, read(value)]);
+  }
+
+  function read(v) {
+    let val = v;
+    let mem = v >>> 2;
+
+    if (((val & 0b11) === 0b10)) { /// mem pointer
+      val =  readInt32(mem);
+    }
+    if (((val & 0b11) === 0b01)) { /// list pointer
+      return readList(mem, []);
+    }
+
+    if (((val & 0xF) === 0xF)) { // integer
+      return (val >>> 4);
+    }
+    return null;
+
   }
 
   function unpack(...args) {
-    const ret = [];
-    for(let idx = 0; idx < args.length ; idx += 2) {
-      const tag = args[idx];
-      const val = args[idx + 1];
-      if (tag === 0) {
-        ret.push(val);
-      }
-      if (tag === 10) {
-        ret.push(get_string(val));
-      }
-    }
+    // console.log('u', args);
+    const ret = args.map(read);
     return ret;
   }
+  function tag2(value, tag) {
+    return value << 2 | tag;
+  }
+  function tagF(value) {
+    return value << 4 | 0xF;
+  }
+
   function pack(...args) {
-    const ret = [];
-    for (let idx = 0; idx < args.length; idx += 1) {
-      let arg = args[idx];
+    return args.map((arg) => {
       if (typeof arg === 'number') {
-        ret.push(0);
-        ret.push(arg);
+        return (arg << 4 | 0xF);
       } else if (typeof arg === 'string') {
-        ret.push(10);
-        ret.push(write_string(arg));
+        const mem = write_string(arg);
+        return tag2(mem, 0b10);
       }
-    }
-    return ret;
+      return 0x01;
+    });
   }
   function call(name, ...args) {
     const arity = (args.length);
-    const ret = instance.exports[`${name}/${arity}`](...pack(...args)) || [0, null];
-    const _unpackedRet = unpack(...ret);
+    const packedArgs = pack(...args);
+    // console.log('packed args', packedArgs);
+    const ret = instance.exports[`${name}/${arity}`](...packedArgs);
+    const _unpackedRet = unpack(ret).map(maybe_string);
+
     return _unpackedRet.length === 1 ? _unpackedRet[0] : _unpackedRet;
   }
   const imports = {
     console: {
       log(...args) {
-        const unpackedArgs = unpack(...args);
-        console.log('log/' + (arguments.length/2), ...unpackedArgs);
+        const unpackedArgs = unpack(...args)
+          .map(maybe_string);
+        console.log('log/' + (arguments.length), ...unpackedArgs);
         return [0, 0];
       }
     },
@@ -107,8 +145,13 @@ const wasi = new WASI({
   };
   const instance = new WebAssembly.Instance(wasm, imports);
   console.log('main', call('main'));
-  // console.log('conditional', call('conditional', 100));
-  // console.log('loop', call('loop', 1));
+  console.log('second', call('second'));
+  console.log('n', call('n', 1));
+  console.log('other', call('other'));
+  console.log('conditional', call('conditional', 90));
+  console.log('conditional', call('conditional', 900));
+  console.log('loop', call('loop', 1));
+  console.log('printStr', call('printStr', 'ME'));
 
 
 })();
