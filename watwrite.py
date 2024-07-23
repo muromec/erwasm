@@ -17,7 +17,7 @@ FUNC = '''
 )
 '''
 FUNC_EXPORT = '''
-(export "{name}/{arity}" (func ${name}_{arity}))
+(export "{mod}#{name}-a{arity}" (func ${name}_{arity}))
 '''
 
 FUNC_IMPORT = '''
@@ -27,9 +27,12 @@ FUNC_IMPORT = '''
 LITERAL = '''
   (data (i32.const {offset}) "{value}")
 '''
+GLOBAL_CONST = '''
+  (global ${name} i32 (i32.const {value}))
+'''
 MEM_NEXT_FREE = '''
   ;; next free memory offset
-  (data (i32.const {offset0}) "{offset}")
+  (global $__free_mem i32 (i32.const {offset}))
 '''
 
 def pad(n):
@@ -76,12 +79,19 @@ def make_in_params_n(n):
 def fix_string(value):
   return  decode(value, 'unicode-escape')
 
-def pack_literal(value, offset, push):
+def pack_literal(value, push):
+  if isinstance(value, int):
+    return (make_len(value), 0)
+
   if isinstance(value, str):
+    value = list(map(ord, fix_string(value)))
+
+  if isinstance(value, list):
+    # print('pack literal', repr(value))
+    assert all(map(lambda v: isinstance(v, int), value)), 'Only list of ints'
     ret = ''
-    for int_value in map(ord, fix_string(value)):
-      offset += 8
-      ret += make_len(offset << 2 | 1)
+    for int_value in value:
+      ret += make_len(8 << 2 | 1)
       ret += make_len(int_value << 4 | 0xF)
 
     ret += make_len(0x3b)
@@ -89,30 +99,16 @@ def pack_literal(value, offset, push):
 
     return ret
 
-  if isinstance(value, int):
-    return (make_len(value), 0)
-
-  if isinstance(value, list) or isinstance(value, typle):
-    n_items = len(value)
-    ret = [
-      push(element)
-      for element in value
-    ] + [[0, 0]]
-    packed_ret = [
-      make_len(off) +
-      make_len(typ) +
-      make_len((n_items - 1 - idx) * 3)
-      for idx, (off, typ) in enumerate(ret)
-    ]
-    buffer = "".join(packed_ret)
-    return (buffer, 20)
-
   assert False, f'cant pack as constant value {value}'
 
 def produce_wasm(module):
   body = ''
   data = ''
   imports = []
+
+  def ignore_call(ext_mod, ext_fn):
+    if ext_mod == 'erlang' and ext_fn == 'get_module_info':
+      return True
 
   def add_import(ext_mod, ext_fn, ext_fn_arity):
     import_line = FUNC_IMPORT.format(
@@ -126,21 +122,32 @@ def produce_wasm(module):
   def add_literal(sval):
     nonlocal data
     nonlocal literalidx
-    packed_value = pack_literal(sval, literalidx, add_literal)
+    packed_value = pack_literal(sval, add_literal)
     data += LITERAL.format(
       offset = literalidx,
       value = packed_value,
     )
+    name = f'__{literalidx}__literal_ptr_raw'
+    data += GLOBAL_CONST.format(
+      name = name,
+      value = literalidx,
+    )
+    name = f'__{literalidx}__literal_ptr_e'
+    data += GLOBAL_CONST.format(
+      name = name,
+      value = (literalidx << 2) | 2,
+    )
+
     ret = literalidx + 0
     literalidx += len(packed_value)
-    return ret
+    return name
 
   literalidx = 4
   for func in module.functions:
     max_xregs = max(int(func.arity), 1)
     max_yregs = 0
     if (func.name, func.arity) in module.export_funcs:
-      body += FUNC_EXPORT.format(name=func.name, arity=func.arity)
+      body += FUNC_EXPORT.format(name=func.name, arity=func.arity, mod=module.name)
 
     b = '\n'
 
@@ -199,6 +206,10 @@ def produce_wasm(module):
       nonlocal b
       b += f'(local.set $var_{typ}reg_{num}_val (i32.const {val}))\n'
 
+    def set_val_mem_offset(typ, num, name):
+      nonlocal b
+      b += f'(local.set $var_{typ}reg_{num}_val (global.get ${name}))'
+
     def set_const(typ, num, val):
       #set_typ_reg(typ, num, tag)
       set_val_reg(typ, num, val)
@@ -223,12 +234,13 @@ def produce_wasm(module):
 
 
     def populate_with(dtyp, reg_n, value):
-      [typ, [val]] = value
+      [typ, rval] = value
+      val = rval[0]
       if typ == 'integer':
         set_const(dtyp, reg_n, (int(val) << 4) | 0xF)
       elif typ == 'literal':
-        mem_offset = add_literal(val)
-        set_const(dtyp, reg_n, (int(mem_offset) << 2) | 0b10)
+        literal_name = add_literal(rval[0])
+        set_val_mem_offset(dtyp, reg_n, literal_name)
       elif typ == 'atom':
         # set_const(dtyp, reg_n, 0, 20) # TODO: implement atoms
         pass
@@ -247,8 +259,9 @@ def produce_wasm(module):
         val = (int(val) << 4 | 0xF)
         b += f'(i32.const {val})\n'
       elif typ == 'literal':
-        mem_offset = add_literal(val)
+        literal_name = add_literal(val)
         b += f'(i32.const {mem_offset})\n'
+        assert False
       elif typ == 'atom':
         b += f'(i32.const 0)\n' # TODO: implement atoms
       elif typ == 'x' or typ == 'y':
@@ -320,11 +333,32 @@ def produce_wasm(module):
           'is_le': 'i32.le_u\n',
           'is_gt': 'i32.gt_u\n',
           'is_ge': 'i32.ge_u\n',
-          'is_nonempty_list': 'i32.load\n'
+          'is_nonempty_list': f'''
+            ;; test that the list it not empty
+            (local.set $temp)
+
+            (local.get $temp)
+            (i32.and (i32.const 3))
+            (if
+              (i32.eq (i32.const 2)) ;; mem ref
+              (then
+                (local.get $temp)
+                (i32.shr_u (i32.const 2))
+                (i32.load)
+                (i32.and (i32.const 3))
+                (i32.eq (i32.const 1))
+                (local.set $temp)
+              )
+              (else
+                (i32.const 0)
+                (local.set $temp)
+              )
+            )
+            (local.get $temp)
+          '''
         }[op]
 
-        b += '(i32.const 0)\n'
-        b += '(i32.eq)\n'
+        b += '(i32.eqz)\n'
         jump_depth = labels_to_idx.index(jump)
         b += f'(local.set $jump (i32.const {jump_depth}))\n'
         b += f'(br_if $start)\n'
@@ -344,6 +378,8 @@ def produce_wasm(module):
 
       if styp == 'call_ext_only':
         [ext_mod, ext_fn, ext_fn_arity] = statement[1][1][1]
+        if ignore_call(ext_mod, ext_fn):
+          continue
         add_import(ext_mod, ext_fn, ext_fn_arity)
         max_xregs = max(max_xregs, int(ext_fn_arity))
 
@@ -433,47 +469,39 @@ def produce_wasm(module):
         [dtyp, [dnum]] = darg
         dnum = int(dnum)
 
-        # if its a string
-        f'''
-        (block
-          (local.get $var_{styp}reg_{snum}_tag)
-          (i32.eq (i32.const 10))
-          (if
-            (then
-              (local.get $var_{styp}reg_{snum}_val)
-              (i32.add (i32.const 4))
-              (i32.load)
-              (i32.const 0xff)
-              (i32.and)
-              (local.set $var_{dtyp}reg_{dnum}_val)
-              (local.set $var_{dtyp}reg_{dnum}_tag (i32.const 0))
-              br 2
+        b += f'''
+        (local.get $var_{styp}reg_{snum}_val)
+        (i32.and (i32.const 3))
+        (if
+          (i32.eq (i32.const 2)) ;; mem ref
+          (then
+            (local.get $var_{styp}reg_{snum}_val)
+            (i32.shr_u (i32.const 2))
+            (local.set $temp) ;; this hold reference of list head
+            (i32.load (local.get $temp))
+            (i32.and (i32.const 3))
+            (if (i32.eq (i32.const 1))
+              (then
+                (i32.load (i32.add (i32.const 4) (local.get $temp)))
+                (local.set $var_{dtyp}reg_{dnum}_val)
+              )
+              (else
+                (unreachable)
+              )
             )
           )
-        )\n'''
-
-        # set_val_reg(dtyp, dnum, 3)
-        push(styp, snum, 'val')
-        push(styp, snum, 'val')
-        b += 'i32.const 4\n'
-        b += 'i32.add\n'
-        b += 'i32.load\n'
-        pop(dtyp, dnum, 'val')
-
-        """
-        b += 'i32.const 8\n'
-        b += 'i32.add\n'
-        b += 'i32.load\n'
-        pop(dtyp, dnum, 'tag')
-        """
-
-        load_if_int(dtyp, dnum)
+          (else
+            (unreachable)
+          )
+        )
+        \n'''
 
         b += ') ;; end get_hd\n'
 
       if styp == 'get_tl':
         b += '(block ;; get_tl\n'
         b += ';; get_tl\n'
+        #print('s', styp, sbody)
 
         [sarg, darg] = sbody
         [styp, [snum]] = sarg
@@ -481,28 +509,49 @@ def produce_wasm(module):
         [dtyp, [dnum]] = darg
         dnum = int(dnum)
 
-        # if its a string
-        f'''
-        (block
-          (local.get $var_{styp}reg_{snum}_tag)
-          (i32.eq (i32.const 10))
-          (if
-            (then
-              (local.get $var_{styp}reg_{snum}_tag)
-              (local.get $var_{styp}reg_{snum}_val)
-              (i32.add (i32.const 1))
-              (local.set $var_{dtyp}reg_{dnum}_val)
-              (local.set $var_{dtyp}reg_{dnum}_tag)
-              br 2 ;; $2 out of the block early
+        b += f'''
+        (local.get $var_{styp}reg_{snum}_val)
+        (i32.and (i32.const 3))
+        (if
+          (i32.eq (i32.const 2)) ;; mem ref
+          (then
+            (local.get $var_{styp}reg_{snum}_val)
+            (i32.shr_u (i32.const 2))
+            (local.set $temp) ;; this hold reference of list head
+            (i32.load (local.get $temp))
+            (if
+              (i32.eq (i32.const 0x3b))
+              (then
+                (local.set $var_{dtyp}reg_{dnum}_val (i32.const 0))
+                (br 0)
+              )
             )
-          ) ;; $0
-        ) ;; $1\n'''
-
-        push(styp, snum, 'val')
-        b += 'i32.const 12\n'
-        b += 'i32.add\n'
-        pop(dtyp, dnum, 'val')
-        set_typ_reg(dtyp, dnum, 20)
+            (i32.load (local.get $temp))
+            (i32.and (i32.const 3))
+            (if (i32.eq (i32.const 1))
+              (then
+                (i32.add
+                  (i32.shr_u
+                    (i32.load (local.get $temp))
+                    (i32.const 2)
+                  )
+                  (local.get $temp)
+                )
+                (i32.const 2)
+                (i32.shl)
+                (i32.or (i32.const 2))
+                (local.set $var_{dtyp}reg_{dnum}_val)
+              )
+              (else
+                (unreachable)
+              )
+            )
+          )
+          (else
+            (unreachable)
+          )
+        )
+        \n'''
 
         b += ') ;; $2 end get_tl\n'
 
@@ -532,8 +581,7 @@ def produce_wasm(module):
       body=b,
     )
   data = MEM_NEXT_FREE.format(
-    offset0=0,
-    offset=make_len(literalidx),
+    offset=literalidx,
   ) + data
   return MODULE.format(
     name=module.name,

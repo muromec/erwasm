@@ -1,8 +1,9 @@
 class Module:
-  def __init__(self, name, export_funcs, functions):
+  def __init__(self, name, export_funcs, functions, attrs):
     self.name = name
     self.functions = functions
     self.export_funcs = export_funcs
+    self.attrs = attrs
 
   def find_function(self, start_label):
     for func in self.functions:
@@ -23,6 +24,7 @@ def make_module(parse_beam):
   export_funcs = None
   current_func = None
   functions = []
+  attrs = {}
   for sentence in parse_beam:
     typ = sentence[0]
     if typ == 'module':
@@ -38,7 +40,12 @@ def make_module(parse_beam):
       [name, arity, start_label] = sentence[1]
       current_func = Func(name, int(arity), int(start_label))
       functions.append(current_func)
+    if typ == 'attributes':
+      attrs.update([
+        (key, value[0])
+        for key, value in sentence[1][0]
+      ])
     elif current_func:
       current_func.statements.append(sentence)
 
-  return Module(module_name, export_funcs, functions)
+  return Module(module_name, export_funcs, functions, attrs)

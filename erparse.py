@@ -49,11 +49,11 @@ def clean_v(value):
 
 def parse_sentence_helper(text, State):
   state = 'name'
-  ret = []
   sentence = None
   name = ''
   children = []
   arg_name = ''
+  literal = ''
 
   while State.idx < len(text):
     symbol = text[State.idx]
@@ -69,6 +69,9 @@ def parse_sentence_helper(text, State):
     elif state == None and symbol == '[':
       child_sentence = parse_list_sentence_helper(text, State)
       children.append(child_sentence)
+    elif state == None and symbol == '"':
+      literal = ''
+      state = 'inside_literal'
     elif state == None and symbol == '{':
       child_sentence = parse_sentence_helper(text, State)
       children.append(child_sentence)
@@ -81,6 +84,12 @@ def parse_sentence_helper(text, State):
       arg_name = None
     elif state == 'arg_name':
       arg_name += symbol
+    elif state == 'inside_literal' and symbol == '"':
+      state = None
+      children.append(literal)
+    elif state == 'inside_literal':
+      literal += symbol
+
     
   if arg_name:
     children.append(clean_v(arg_name))

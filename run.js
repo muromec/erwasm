@@ -2,7 +2,7 @@
 const { readFile } = require('node:fs/promises');
 const { WASI } = require('wasi');
 const { argv, env } = require('node:process');
-const { join } = require('node:path');
+const { join, basename } = require('node:path');
 
 const wasi = new WASI({
   version: 'preview1',
@@ -69,13 +69,13 @@ const wasi = new WASI({
   }
 
   function readList(offset, acc) {
-    const tail = readInt32(offset);
+    const tail_offset = readInt32(offset);
     const value = readInt32(offset + 4);
 
-    if (tail === 0x3b) {
+    if (tail_offset === 0x3b) {
       return acc;
     }
-    return readList(tail >> 2, [...acc, read(value)]);
+    return readList((tail_offset >> 2) + offset, [...acc, read(value)]);
   }
 
   function read(v) {
@@ -120,10 +120,11 @@ const wasi = new WASI({
     });
   }
   function call(name, ...args) {
+    const modname = basename(fname, '.wasm');
     const arity = (args.length);
     const packedArgs = pack(...args);
     // console.log('packed args', packedArgs);
-    const ret = instance.exports[`${name}/${arity}`](...packedArgs);
+    const ret = instance.exports[`${modname}#${name}-a${arity}`](...packedArgs);
     const _unpackedRet = unpack(ret).map(maybe_string);
 
     return _unpackedRet.length === 1 ? _unpackedRet[0] : _unpackedRet;
