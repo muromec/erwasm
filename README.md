@@ -1,7 +1,7 @@
 
 # Readme
 
-python pycompile.py  simple.erl
+make run
 
 # Wat
 
