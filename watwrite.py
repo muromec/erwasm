@@ -162,12 +162,16 @@ def produce_wasm(module):
 
     def push(typ, num, part):
       nonlocal b
+      nonlocal max_xregs
+      nonlocal max_yregs
+
       assert part == 'val'
       assert typ in ['x', 'y']
+
       if typ == 'x':
-        assert num <= max_xregs
+        max_xregs = max(max_xregs, num + 1)
       if typ == 'y':
-        assert num <= max_yregs
+        max_yregs = max(max_yregs, num, + 1)
 
       b += f'local.get $var_{typ}reg_{num}_{part}\n'
 
@@ -324,6 +328,11 @@ def produce_wasm(module):
 
       if styp == 'test':
         [op, (_f, [jump]), args] = sbody
+
+        # setup jump target
+        jump_depth = labels_to_idx.index(jump)
+        b += f'(local.set $jump (i32.const {jump_depth}));; to label {jump}\n'
+
         for arg in args:
           populate_stack_with(arg)
 
@@ -333,6 +342,30 @@ def produce_wasm(module):
           'is_le': 'i32.le_u\n',
           'is_gt': 'i32.gt_u\n',
           'is_ge': 'i32.ge_u\n',
+          'is_eq_exact': 'i32.eq\n',
+          'is_nil': '''
+            (local.set $temp)
+            (loop $loop
+
+            (local.get $temp)
+            (i32.and (i32.const 3))
+            (if
+              (i32.eq (i32.const 2)) ;; mem ref
+              (then
+                (local.get $temp)
+                (i32.shr_u (i32.const 2))
+                (i32.load)
+                (local.set $temp)
+                (br $loop)
+              )
+              (else
+                (local.set $temp
+                  (i32.eq (i32.const 0x3b) (local.get $temp))
+                )
+              )
+            ))
+            (local.get $temp)
+          ''',
           'is_nonempty_list': f'''
             ;; test that the list it not empty
             (local.set $temp)
@@ -358,10 +391,9 @@ def produce_wasm(module):
           '''
         }[op]
 
-        b += '(i32.eqz)\n'
-        jump_depth = labels_to_idx.index(jump)
-        b += f'(local.set $jump (i32.const {jump_depth}))\n'
-        b += f'(br_if $start)\n'
+        # erlang test condition jump is inverted
+        # jump to the label specified if the condition fails
+        b += f'(i32.eqz) (br_if $start)\n'
 
       if styp == 'call_ext':
         [ext_mod, ext_fn, ext_fn_arity] = statement[1][1][1]
@@ -388,7 +420,7 @@ def produce_wasm(module):
           push('x', xreg, 'val')
 
         b += f'call ${ext_mod}_{ext_fn}_{ext_fn_arity}\n'
-        b += 'return';
+        b += 'return\n';
 
       if styp == 'call_ext_last':
         [_arity, (_e, [ext_mod, ext_fn, ext_fn_arity]), _regs] = sbody
@@ -400,7 +432,7 @@ def produce_wasm(module):
           push('x', xreg, 'val')
 
         b += f'call ${ext_mod}_{ext_fn}_{ext_fn_arity}\n'
-        b += 'return';
+        b += 'return\n';
 
       if styp == 'call_only':
         [arity, (_f, [findex])] = sbody
@@ -414,7 +446,10 @@ def produce_wasm(module):
           push('x', xreg, 'val')
 
         b += f'call ${into_func.name}_{into_func.arity}\n'
-        b += 'return';
+        b += 'return\n';
+
+      if styp == 'badmatch':
+        b += '(unreachable) ;; badmatch\n'
 
       if styp == 'call':
         [arity, (_f, [findex])] = sbody
@@ -443,7 +478,7 @@ def produce_wasm(module):
           push('x', xreg, 'val')
 
         b += f'call ${into_func.name}_{into_func.arity}\n'
-        b += 'return';
+        b += 'return\n';
 
       if styp == 'gc_bif':
         [op, _fall, arity, [arg0, arg1], ret] = sbody
@@ -458,6 +493,58 @@ def produce_wasm(module):
 
         if retT == 'x' or retT == 'y':
           pop(retT, int(retV), 'val')
+
+      if styp == 'get_list':
+        b += '(block ;; get_list\n'
+
+        [sarg, darg_h, darg_t] = sbody
+        [styp, [snum]] = sarg
+        snum = int(snum)
+        [dtyp_h, [dnum_h]] = darg_h
+        [dtyp_t, [dnum_t]] = darg_t
+        dnum_h = int(dnum_h)
+        dnum_t = int(dnum_t)
+
+        b += f'''
+        (local.get $var_{styp}reg_{snum}_val)
+        (i32.and (i32.const 3))
+        (if
+          (i32.eq (i32.const 2)) ;; mem ref
+          (then
+            (local.get $var_{styp}reg_{snum}_val)
+            (i32.shr_u (i32.const 2))
+            (local.set $temp) ;; this hold reference of list head
+            (i32.load (local.get $temp))
+            (i32.and (i32.const 3))
+            (if (i32.eq (i32.const 1))
+              (then
+                (i32.load (i32.add (i32.const 4) (local.get $temp)))
+                (local.set $var_{dtyp}reg_{dnum_h}_val) ;; head
+
+                (i32.add
+                  (i32.shr_u
+                    (i32.load (local.get $temp))
+                    (i32.const 2)
+                  )
+                  (local.get $temp)
+                )
+                (i32.const 2)
+                (i32.shl)
+                (i32.or (i32.const 2))
+                (local.set $var_{dtyp}reg_{dnum_t}_val) ;; tail
+              )
+              (else
+                (unreachable)
+              )
+            )
+          )
+          (else
+            (unreachable)
+          )
+        )
+        \n'''
+
+        b += ') ;; end get_listn\n'
 
       if styp == 'get_hd':
         b += '(block ;; get_hd\n'
