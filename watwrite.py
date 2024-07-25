@@ -642,6 +642,32 @@ def produce_wasm(module):
 
         b += ') ;; $2 end get_tl\n'
 
+      if styp == 'select_val':
+        b += ';; select_val\n'
+
+        [sarg, [_f, [def_jump]], [_l, [comp_table]]] = sbody
+        populate_stack_with(sarg)
+
+        b += '(local.set $temp)\n'
+
+        b += f';; default target is {def_jump} \n'
+        while comp_table:
+          value = comp_table.pop(0)
+          [_f, [jump]] = comp_table.pop(0)
+
+          jump_depth = labels_to_idx.index(jump)
+          b += f'(local.set $jump (i32.const {jump_depth}));; to label {jump}\n'
+
+          populate_stack_with(sarg)
+          populate_stack_with(value)
+
+          b += '(i32.eq) (br_if $start)\n'
+
+        jump_depth = labels_to_idx.index(def_jump)
+        b += f'(local.set $jump (i32.const {jump_depth}));; to label {def_jump}\n'
+        b += '(br $start)\n'
+
+
       # print('s', styp)
 
     b += ') ;; end of loop\n'
