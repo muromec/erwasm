@@ -103,6 +103,9 @@ def parse_sentence(text):
   if text == 'return':
     return 'return', []
 
+  if text == 'send':
+    return 'send', []
+
   return parse_sentence_helper(text, State)
 
 
@@ -116,7 +119,7 @@ def parse_beam(text):
       sentence = symbol
     elif state == None and symbol == '%':
       state = 'comment'
-    elif state == None and symbol == 'r':
+    elif state == None and (symbol == 'r' or symbol == 's'):
       state = 'inside'
       sentence = symbol
     elif state == 'comment' and symbol == '\n':
@@ -126,6 +129,12 @@ def parse_beam(text):
       ret.append(sentence)
       sentence = None
     elif state == 'inside' and symbol == '"':
+      state = 'inside_literal'
+      sentence += symbol
+    elif state == 'inside_literal' and symbol == '\\':
+      state = 'inside_literal_quote'
+      sentence += symbol
+    elif state == 'inside_literal_quote':
       state = 'inside_literal'
       sentence += symbol
     elif state == 'inside_literal' and symbol == '"':
@@ -141,3 +150,11 @@ def parse(beam_text):
   mod = make_module(map(parse_sentence, sentences))
   return mod
 
+def main(fname):
+  with open(fname, 'r') as beam_text_f:
+    mod = parse(beam_text_f.read())
+    print('mod', mod)
+
+if __name__ == '__main__':
+  import sys
+  main(*sys.argv[1:])

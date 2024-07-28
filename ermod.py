@@ -18,6 +18,9 @@ class Func:
     self.start_label = start_label
     self.statements = []
 
+  def __repr__(self):
+    return f'<f: {self.name}/{self.arity}, label {self.start_label}>'
+
 
 def make_module(parse_beam):
   module_name = None
