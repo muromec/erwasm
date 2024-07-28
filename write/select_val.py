@@ -13,7 +13,7 @@ class SelectVal:
     self.comp_table = comp_table
 
   def to_wat(self, ctx):
-    comp_table = self.comp_table
+    comp_table = self.comp_table[:]
 
     b = f';; select_val default target is {self.fnumber} \n'
 
