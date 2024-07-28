@@ -5,6 +5,7 @@ from write.jump import Jump
 from write.move import Move
 from write.test import Test
 from write.ret import Ret
+from write.select_val import SelectVal
 
 from write.utils import (
   add_import, populate_stack_with, make_result_n, make_in_params_n,
@@ -128,6 +129,7 @@ def produce_wasm(module):
         'move': Move,
         'test': Test,
         'return': Ret,
+        'select_val': SelectVal,
       }.get(styp)
       op_imp = op_cls(*sbody) if op_cls else None
 
@@ -157,6 +159,9 @@ def produce_wasm(module):
         b += f') ;; end of depth {depth}\n'
 
         depth += 1
+
+      elif styp == 'badmatch':
+        b += '(unreachable) ;; badmatch\n'
 
       elif styp == 'call_ext':
         [ext_mod, ext_fn, ext_fn_arity] = statement[1][1][1]
@@ -211,9 +216,6 @@ def produce_wasm(module):
 
         b += f'call ${into_func.name}_{into_func.arity}\n'
         b += 'return\n';
-
-      elif styp == 'badmatch':
-        b += '(unreachable) ;; badmatch\n'
 
       elif styp == 'call':
         [arity, (_f, [findex])] = sbody
@@ -416,31 +418,6 @@ def produce_wasm(module):
         \n'''
 
         b += ') ;; $2 end get_tl\n'
-
-      elif styp == 'select_val':
-        b += ';; select_val\n'
-
-        [sarg, [_f, [def_jump]], [_l, [comp_table]]] = sbody
-        b += populate_stack_with(Ctx, sarg)
-
-        b += '(local.set $temp)\n'
-
-        b += f';; default target is {def_jump} \n'
-        while comp_table:
-          value = comp_table.pop(0)
-          [_f, [jump]] = comp_table.pop(0)
-
-          jump_depth = labels_to_idx.index(jump)
-          b += f'(local.set $jump (i32.const {jump_depth}));; to label {jump}\n'
-
-          b += populate_stack_with(Ctx, sarg)
-          b += populate_stack_with(Ctx, value)
-
-          b += '(i32.eq) (br_if $start)\n'
-
-        jump_depth = labels_to_idx.index(def_jump)
-        b += f'(local.set $jump (i32.const {jump_depth}));; to label {def_jump}\n'
-        b += '(br $start)\n'
 
       elif styp == 'send':
         push('x', 1, 'val')
