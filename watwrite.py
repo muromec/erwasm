@@ -7,6 +7,14 @@ from write.test import Test
 from write.ret import Ret
 from write.select_val import SelectVal
 from write.list import GetList, GetHead, GetTail
+from write.call import (
+  LocalCall, LocalCallDrop, LocalCallTail,
+  ExternalCall, ExternalCallDrop, ExternalCallTail,
+)
+from write.bif import Bif
+from write.block import Label, FuncInfo, BadMatch
+from write.regs import Allocate, Trim, VariableMetaNop
+from write.proc import Send
 
 from write.utils import (
   add_import, populate_stack_with, make_result_n, make_in_params_n,
@@ -49,10 +57,6 @@ MEM_NEXT_FREE = '''
 def produce_wasm(module):
   body = ''
 
-  def ignore_call(ext_mod, ext_fn):
-    if ext_mod == 'erlang' and ext_fn == 'get_module_info':
-      return True
-
   class Ctx:
     labels_to_idx = []
     imports = []
@@ -61,6 +65,10 @@ def produce_wasm(module):
 
     max_xregs = 1
     max_yregs = 0
+
+    find_function = module.find_function
+
+    depth = 0
 
   for func in module.functions:
     Ctx.max_xregs = max(int(func.arity), 1)
@@ -87,15 +95,10 @@ def produce_wasm(module):
       nonlocal b
       b += _pop(Ctx, typ, num)
 
-    def set_val_reg(typ, num, val):
-      nonlocal b
-      b += f'(local.set $var_{typ}reg_{num}_val (i32.const {val}))\n'
-
     def move(styp, snum, dtyp, dnum):
       nonlocal b
       _move(Ctx, styp, snum, dtyp, dnum)
 
-    depth = 0
     labels = list([
       statement[1][0]
       for statement in func.statements
@@ -123,167 +126,44 @@ def produce_wasm(module):
     for statement in func.statements[1:]:
       styp = statement[0]
       sbody = statement[1]
-      
+
       op_cls = {
+        'label': Label,
+        'func_info': FuncInfo,
         'line': Line,
         'jump': Jump,
         'move': Move,
         'test': Test,
         'return': Ret,
         'select_val': SelectVal,
+        'badmatch': BadMatch,
+
+        'allocate': Allocate,
+        'trim': Trim,
+        '\'%\'': VariableMetaNop,
+
         'get_list': GetList,
         'get_hd': GetHead,
         'get_tl': GetTail,
+
+        'call': LocalCall,
+        'call_only': LocalCallDrop,
+        'call_last': LocalCallTail,
+        'call_ext': ExternalCall,
+        'call_ext_only': ExternalCallDrop,
+        'call_ext_last': ExternalCallTail,
+
+        'gc_bif': Bif,
+
+        'send': Send,
       }.get(styp)
       op_imp = op_cls(*sbody) if op_cls else None
 
       if op_imp:
         b += op_imp.to_wat(Ctx)
-
-      elif styp == "'%'":
-        pass
-
-      elif styp == 'func_info':
-        b += 'unreachable ;; func info trap\n'
-
-      elif styp == 'allocate':
-        [yreg, xreg] = sbody
-        Ctx.max_yregs = max(Ctx.max_yregs, int(yreg))
-        Ctx.max_xregs = max(Ctx.max_xregs, int(xreg))
-
-      elif styp == 'trim':
-        [nremove, nleft] = sbody
-        nremove = int(nremove)
-        nleft = int(nleft)
-        for yreg in range(0, nleft):
-          move('y', yreg + nremove, 'y', yreg)
-
-      elif styp == 'label':
-        b += f';; label {sbody[0]}, deep {depth}\n'
-        b += f') ;; end of depth {depth}\n'
-
-        depth += 1
-
-      elif styp == 'badmatch':
-        b += '(unreachable) ;; badmatch\n'
-
-      elif styp == 'call_ext':
-        [ext_mod, ext_fn, ext_fn_arity] = statement[1][1][1]
-        add_import(Ctx, ext_mod, ext_fn, ext_fn_arity)
-        Ctx.max_xregs = max(Ctx.max_xregs, int(ext_fn_arity))
-
-        for xreg in range(0, int(ext_fn_arity)):
-          # push('x', xreg, 'tag')
-          push('x', xreg, 'val')
-
-        b += f'call ${ext_mod}_{ext_fn}_{ext_fn_arity}\n'
-        pop('x', 0, 'val')
-        # pop('x', 0, 'tag')
-
-      elif styp == 'call_ext_only':
-        [ext_mod, ext_fn, ext_fn_arity] = statement[1][1][1]
-        Ctx.max_xregs = max(Ctx.max_xregs, int(ext_fn_arity))
-
-        if ignore_call(ext_mod, ext_fn):
-          continue
-        add_import(Ctx, ext_mod, ext_fn, ext_fn_arity)
-
-        for xreg in range(0, int(ext_fn_arity)):
-          # push('x', xreg, 'tag')
-          push('x', xreg, 'val')
-
-        b += f'call ${ext_mod}_{ext_fn}_{ext_fn_arity}\n'
-        b += 'return\n';
-
-      elif styp == 'call_ext_last':
-        [_arity, (_e, [ext_mod, ext_fn, ext_fn_arity]), _regs] = sbody
-        add_import(Ctx, ext_mod, ext_fn, ext_fn_arity)
-        Ctx.max_xregs = max(Ctx.max_xregs, int(ext_fn_arity))
-
-        for xreg in range(0, int(ext_fn_arity)):
-          # push('x', xreg, 'tag')
-          push('x', xreg, 'val')
-
-        b += f'call ${ext_mod}_{ext_fn}_{ext_fn_arity}\n'
-        b += 'return\n';
-
-      elif styp == 'call_only':
-        [arity, (_f, [findex])] = sbody
-        arity = int(arity)
-        Ctx.max_xregs = max(Ctx.max_xregs, int(arity))
-        findex = int(findex)
-        into_func = module.find_function(findex)
-
-        for xreg in range(0, arity):
-          # push('x', xreg, 'tag')
-          push('x', xreg, 'val')
-
-        b += f'call ${into_func.name}_{into_func.arity}\n'
-        b += 'return\n';
-
-      elif styp == 'call':
-        [arity, (_f, [findex])] = sbody
-        arity = int(arity)
-        Ctx.max_xregs = max(Ctx.max_xregs, int(arity))
-        findex = int(findex)
-        into_func = module.find_function(findex)
-
-        for xreg in range(0, arity):
-          # push('x', xreg, 'tag')
-          push('x', xreg, 'val')
-
-        b += f'call ${into_func.name}_{into_func.arity}\n'
-        pop('x', 0, 'val')
-        # pop('x', 0, 'tag')
-
-      elif styp == 'call_last':
-        [arity, (_f, [findex]), regs] = sbody
-        arity = int(arity)
-        Ctx.max_xregs = max(Ctx.max_xregs, int(arity))
-        findex = int(findex)
-        into_func = module.find_function(findex)
-
-        for xreg in range(0, arity):
-          # push('x', xreg, 'tag')
-          push('x', xreg, 'val')
-
-        b += f'call ${into_func.name}_{into_func.arity}\n'
-        b += 'return\n';
-
-      elif styp == 'gc_bif':
-        [op, _fall, arity, [arg0, arg1], ret] = sbody
-        (retT, [retV]) = ret
-
-        b += populate_stack_with(Ctx, arg0)
-        b += populate_stack_with(Ctx, arg1)
-
-        if op == "'+'":
-          b += '(i32.xor (i32.const 0xF))\n'
-          b += 'i32.add\n'
-        elif op ==  "'-'":
-          b += '(i32.xor (i32.const 0xF))\n'
-          b += 'i32.sub\n'
-        elif op == "'*'":
-          b += '''
-          (local.set $temp (i32.shr_u))
-          (i32.mul (i32.shr_u) (local.get $temp))
-          '''
-
-        else:
-          assert False, f'unknown bif {op}'
-
-        if retT == 'x' or retT == 'y':
-          pop(retT, int(retV), 'val')
-
-
-      elif styp == 'send':
-        push('x', 1, 'val')
-        b += ';; send \n'
-        b += '(suspend $module_lib_fn_yield-i32)\n'
-
       else:
         # assert False, f'No support for {styp} added yet'
-        print('s', styp)
+        print('not implemented', styp)
 
     b += ') ;; end of loop\n'
     b += 'unreachable\n';

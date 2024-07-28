@@ -42,6 +42,10 @@ def add_import(ctx, ext_mod, ext_fn, ext_fn_arity):
   if import_line not in ctx.imports:
     ctx.imports.append(import_line)
 
+def ignore_call(ext_mod, ext_fn):
+  if ext_mod == 'erlang' and ext_fn == 'get_module_info':
+    return True
+
 def pad(n):
   if len(n) == 1:
     return '0' + n
