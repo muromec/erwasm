@@ -6,6 +6,7 @@ from write.move import Move
 from write.test import Test
 from write.ret import Ret
 from write.select_val import SelectVal
+from write.list import GetList, GetHead, GetTail
 
 from write.utils import (
   add_import, populate_stack_with, make_result_n, make_in_params_n,
@@ -130,6 +131,9 @@ def produce_wasm(module):
         'test': Test,
         'return': Ret,
         'select_val': SelectVal,
+        'get_list': GetList,
+        'get_hd': GetHead,
+        'get_tl': GetTail,
       }.get(styp)
       op_imp = op_cls(*sbody) if op_cls else None
 
@@ -271,153 +275,6 @@ def produce_wasm(module):
         if retT == 'x' or retT == 'y':
           pop(retT, int(retV), 'val')
 
-      elif styp == 'get_list':
-        b += '(block ;; get_list\n'
-
-        [sarg, darg_h, darg_t] = sbody
-        [styp, [snum]] = sarg
-        snum = int(snum)
-        [dtyp_h, [dnum_h]] = darg_h
-        [dtyp_t, [dnum_t]] = darg_t
-        dnum_h = int(dnum_h)
-        dnum_t = int(dnum_t)
-
-        b += f'''
-        (local.get $var_{styp}reg_{snum}_val)
-        (i32.and (i32.const 3))
-        (if
-          (i32.eq (i32.const 2)) ;; mem ref
-          (then
-            (local.get $var_{styp}reg_{snum}_val)
-            (i32.shr_u (i32.const 2))
-            (local.set $temp) ;; this hold reference of list head
-            (i32.load (local.get $temp))
-            (i32.and (i32.const 3))
-            (if (i32.eq (i32.const 1))
-              (then
-                (i32.load (i32.add (i32.const 4) (local.get $temp)))
-                (local.set $var_{dtyp}reg_{dnum_h}_val) ;; head
-
-                (i32.add
-                  (i32.shr_u
-                    (i32.load (local.get $temp))
-                    (i32.const 2)
-                  )
-                  (local.get $temp)
-                )
-                (i32.const 2)
-                (i32.shl)
-                (i32.or (i32.const 2))
-                (local.set $var_{dtyp}reg_{dnum_t}_val) ;; tail
-              )
-              (else
-                (unreachable)
-              )
-            )
-          )
-          (else
-            (unreachable)
-          )
-        )
-        \n'''
-
-        b += ') ;; end get_listn\n'
-
-      elif styp == 'get_hd':
-        b += '(block ;; get_hd\n'
-        b += ';; get_hd\n'
-
-        [sarg, darg] = sbody
-        [styp, [snum]] = sarg
-        snum = int(snum)
-        [dtyp, [dnum]] = darg
-        dnum = int(dnum)
-
-        b += f'''
-        (local.get $var_{styp}reg_{snum}_val)
-        (i32.and (i32.const 3))
-        (if
-          (i32.eq (i32.const 2)) ;; mem ref
-          (then
-            (local.get $var_{styp}reg_{snum}_val)
-            (i32.shr_u (i32.const 2))
-            (local.set $temp) ;; this hold reference of list head
-            (i32.load (local.get $temp))
-            (i32.and (i32.const 3))
-            (if (i32.eq (i32.const 1))
-              (then
-                (i32.load (i32.add (i32.const 4) (local.get $temp)))
-                (local.set $var_{dtyp}reg_{dnum}_val)
-              )
-              (else
-                (unreachable)
-              )
-            )
-          )
-          (else
-            (unreachable)
-          )
-        )
-        \n'''
-
-        b += ') ;; end get_hd\n'
-
-      elif styp == 'get_tl':
-        b += '(block ;; get_tl\n'
-        b += ';; get_tl\n'
-        #print('s', styp, sbody)
-
-        [sarg, darg] = sbody
-        [styp, [snum]] = sarg
-        snum = int(snum)
-        [dtyp, [dnum]] = darg
-        dnum = int(dnum)
-
-        b += f'''
-        (local.get $var_{styp}reg_{snum}_val)
-        (i32.and (i32.const 3))
-        (if
-          (i32.eq (i32.const 2)) ;; mem ref
-          (then
-            (local.get $var_{styp}reg_{snum}_val)
-            (i32.shr_u (i32.const 2))
-            (local.set $temp) ;; this hold reference of list head
-            (i32.load (local.get $temp))
-            (if
-              (i32.eq (i32.const 0x3b))
-              (then
-                (local.set $var_{dtyp}reg_{dnum}_val (i32.const 0))
-                (br 0)
-              )
-            )
-            (i32.load (local.get $temp))
-            (i32.and (i32.const 3))
-            (if (i32.eq (i32.const 1))
-              (then
-                (i32.add
-                  (i32.shr_u
-                    (i32.load (local.get $temp))
-                    (i32.const 2)
-                  )
-                  (local.get $temp)
-                )
-                (i32.const 2)
-                (i32.shl)
-                (i32.or (i32.const 2))
-                (local.set $var_{dtyp}reg_{dnum}_val)
-              )
-              (else
-                (unreachable)
-              )
-            )
-          )
-          (else
-            (unreachable)
-          )
-        )
-        \n'''
-
-        b += ') ;; $2 end get_tl\n'
 
       elif styp == 'send':
         push('x', 1, 'val')
