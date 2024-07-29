@@ -1,4 +1,9 @@
-from write.utils import populate_stack_with
+from write.utils import populate_stack_with, push, pop
+
+def arg(value):
+  [typ, [num]] = value
+  assert typ in ('x', 'y')
+  return typ, int(num)
 
 class Test3:
   def __init__(self, test_op, fail_dest, test_args):
@@ -94,9 +99,27 @@ class Test5:
     jump = self.fnumber
 
     jump_depth = ctx.labels_to_idx.index(jump)
+    sreg = arg(self.test_args[0])
+    dreg = arg(self.dest)
+
     assert not (jump_depth is None)
+
     b = f'(local.set $jump (i32.const {jump_depth}));; to label {jump}\n'
-    print('implement me')
+    b += f'''
+      (call
+        $module_lib_fn_make_match_context
+        { push(ctx, *sreg) }
+        (i32.const 0)
+      )
+      (local.set $temp)
+      (if (i32.eqz (local.get $temp))
+        (then
+          (br $start)
+        )
+      )
+      (local.get $temp)
+      { pop(ctx, *dreg) }
+    '''
 
     return b
 

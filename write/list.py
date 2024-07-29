@@ -60,7 +60,7 @@ class GetList:
             (then
               (i32.const 0x3b)
               { pop_tail }
-              (br $get_tail) ;; return nil atom
+              (br $get_list) ;; return nil atom
             )
           )
         )

@@ -4,6 +4,7 @@ from write.line import Line
 from write.jump import Jump
 from write.move import Move
 from write.test import Test
+from write.byte import BsMatch
 from write.ret import Ret
 from write.select_val import SelectVal
 from write.list import GetList, GetHead, GetTail
@@ -134,6 +135,7 @@ def produce_wasm(module):
         'jump': Jump,
         'move': Move,
         'test': Test,
+        'bs_match': BsMatch,
         'return': Ret,
         'select_val': SelectVal,
         'badmatch': BadMatch,
