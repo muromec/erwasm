@@ -1,4 +1,4 @@
-from write.utils import populate_stack_with, push, pop
+from write.utils import populate_stack_with, push, pop, add_import
 
 def arg(value):
   [typ, [num]] = value
@@ -98,6 +98,7 @@ class Test5:
   def to_wat(self, ctx):
     jump = self.fnumber
 
+    add_import(ctx, 'minibeam', 'make_match_context', 1)
     jump_depth = ctx.labels_to_idx.index(jump)
     sreg = arg(self.test_args[0])
     dreg = arg(self.dest)
@@ -107,7 +108,7 @@ class Test5:
     b = f'(local.set $jump (i32.const {jump_depth}));; to label {jump}\n'
     b += f'''
       (call
-        $module_lib_fn_make_match_context
+        $minibeam_make_match_context_1
         { push(ctx, *sreg) }
         (i32.const 0)
       )

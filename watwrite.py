@@ -17,10 +17,7 @@ from write.block import Label, FuncInfo, BadMatch
 from write.regs import Allocate, Trim, VariableMetaNop
 from write.proc import Send
 
-from write.utils import (
-  add_import, populate_stack_with, make_result_n, make_in_params_n,
-  pop as _pop, push as _push, move as _move,
-)
+from write.utils import make_result_n, make_in_params_n
 
 
 MODULE = '''(module
@@ -87,18 +84,6 @@ def produce_wasm(module):
       arg -= 1
 
     b += f';; arity {func.arity}, input put into X registers\n'
-
-    def push(typ, num, part):
-      nonlocal b
-      b += _push(Ctx, typ, num)
-
-    def pop(typ, num, part):
-      nonlocal b
-      b += _pop(Ctx, typ, num)
-
-    def move(styp, snum, dtyp, dnum):
-      nonlocal b
-      _move(Ctx, styp, snum, dtyp, dnum)
 
     labels = list([
       statement[1][0]

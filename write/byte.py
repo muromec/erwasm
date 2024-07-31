@@ -1,4 +1,4 @@
-from write.utils import push, pop
+from write.utils import push, pop, add_import
 
 def arg(value):
   [typ, [num]] = value
@@ -36,20 +36,25 @@ class BsMatch:
     return b
 
   def command_ensure_at_least(self, ctx, s, n):
+    add_import(ctx, 'minibeam', 'bs_ensure_at_least', 2)
+
     return f'''(call 
-        $module_lib_fn_bs_ensure_at_least
+        $minibeam_bs_ensure_at_least_2
         ({ push(ctx, *self.sreg) })
         (i32.const {s})
         (i32.const {n})
      )\n'''
 
   def command_integer(self, ctx, _xn, _literal, s, n, dreg):
+    add_import(ctx, 'minibeam', 'bs_load_integer', 1)
+
     dreg = arg(dreg)
     return f'''
       ;; get integer from bs match
       (call 
-        $module_lib_fn_bs_integer
+        $minibeam_bs_load_integer_1
         ({ push(ctx, *self.sreg) })
+        (i32.const {s})
       )
       ( { pop(ctx, *dreg) } )
       (i32.const 1)
