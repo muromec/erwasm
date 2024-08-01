@@ -145,14 +145,13 @@
       )
       (unreachable)
     )
-
-    ;; (call $hexlog (local.get $temp)) (drop)
+    ;;(call $hexlog (local.get $offset)) (drop)
 
     (local.set $offset (i32.add (local.get $offset) (local.get $bits_number)))
     (i32.store (i32.add (local.get $ptr) (i32.const 8)) (local.get $offset))
 
-    (i32.shl (local.get $temp) (i32.const 4))
-    (i32.or (i32.const 0xF))
+    ;; (call $hexlog (local.get $temp)) (drop)
+    (local.get $temp)
   )
   (export "minibeam#bs_load_integer" (func $bs_integer))
 
@@ -212,5 +211,138 @@
     )
   )
   (export "minibeam#bs_ensure_at_least" (func $bs_ensure_at_least))
+
+  (func $bs_ensure_exactly (param $ctx i32) (param $unit_size_bits i32) (result i32)
+    (local $ptr i32)
+    (local $bin_ptr i32)
+    (local $size i32)
+    (local $offset i32)
+
+    (if (i32.eq (i32.and (local.get $ctx) (i32.const 2)) (i32.const 2))
+        (then nop)
+        (else unreachable)
+    )
+    (local.set $ptr (i32.shr_u (local.get $ctx) (i32.const 2)))
+
+    (i32.load (local.get $ptr))
+    (i32.and (i32.const 0x3F))
+    (if (i32.eq (i32.const 4)) ;; has to be match ctx
+        (then nop)
+        (else unreachable)
+    )
+
+    (i32.load (i32.add (local.get $ptr) (i32.const 4)))
+    (local.set $bin_ptr)
+
+    (if (i32.eq (i32.and (local.get $bin_ptr) (i32.const 2)) (i32.const 2))
+        (then nop)
+        (else unreachable)
+    )
+    (local.set $bin_ptr (i32.shr_u (local.get $bin_ptr) (i32.const 2)))
+
+    (i32.load (i32.add (local.get $ptr) (i32.const 8)))
+    (local.set $offset)
+    ;; (call $hexlog (local.get $offset)) (drop)
+
+    (i32.load (local.get $bin_ptr))
+    (i32.and (i32.const 0x3F))
+    (if (i32.eq (i32.const 0x24)) ;; has to be heap binary
+        (then nop)
+        (else unreachable)
+    )
+    (i32.load (i32.add (local.get $bin_ptr) (i32.const 4)))
+    (local.set $size)
+
+    ;; everything above this point should be part of bs_match
+    ;; and done once.
+    ;; the reason its not inlined -- op code writers cant declare
+    ;; local variables right now
+    ;; everything below this point should be inlined instead of making this call
+
+    ;; the size is in bits, add offset in bits to it
+    (local.set $size (i32.sub (local.get $size) (local.get $offset)))
+
+    (i32.eq (local.get $size) (local.get $unit_size_bits))
+  )
+  (export "minibeam#bs_ensure_exactly" (func $bs_ensure_exactly))
+
+
+  (func $bs_skip (param $ctx i32) (param $bits_number i32) (result i32)
+    (local $ptr i32)
+    (local $bin_ptr i32)
+    (local $temp i32)
+    (local $offset i32)
+
+    (if (i32.eq (i32.and (local.get $ctx) (i32.const 2)) (i32.const 2))
+        (then nop)
+        (else unreachable)
+    )
+    (local.set $ptr (i32.shr_u (local.get $ctx) (i32.const 2)))
+
+    (i32.load (local.get $ptr))
+    (i32.and (i32.const 0x3F))
+    (if (i32.eq (i32.const 4)) ;; has to be match ctx
+        (then nop)
+        (else unreachable)
+    )
+
+    ;; offset is in bits
+    (i32.load (i32.add (local.get $ptr) (i32.const 8)))
+    (local.set $offset)
+    (local.set $offset (i32.add (local.get $offset) (local.get $bits_number)))
+    (i32.store (i32.add (local.get $ptr) (i32.const 8)) (local.get $offset))
+
+    (i32.const 1);
+  )
+  (export "minibeam#bs_skip" (func $bs_skip))
+
+  (func $bs_get_position (param $ctx i32) (result i32)
+    (local $ptr i32)
+    (local $bin_ptr i32)
+    (local $offset i32)
+
+    (if (i32.eq (i32.and (local.get $ctx) (i32.const 2)) (i32.const 2))
+        (then nop)
+        (else unreachable)
+    )
+    (local.set $ptr (i32.shr_u (local.get $ctx) (i32.const 2)))
+
+    (i32.load (local.get $ptr))
+    (i32.and (i32.const 0x3F))
+    (if (i32.eq (i32.const 4)) ;; has to be match ctx
+        (then nop)
+        (else unreachable)
+    )
+
+    ;; offset is in bits
+    (i32.load (i32.add (local.get $ptr) (i32.const 8)))
+  )
+  (export "minibeam#bs_get_position" (func $bs_get_position))
+
+
+  (func $bs_set_position (param $ctx i32) (param $offset i32) (result i32)
+    (local $ptr i32)
+    (local $bin_ptr i32)
+
+    (if (i32.eq (i32.and (local.get $ctx) (i32.const 2)) (i32.const 2))
+        (then nop)
+        (else unreachable)
+    )
+    (local.set $ptr (i32.shr_u (local.get $ctx) (i32.const 2)))
+
+    (i32.load (local.get $ptr))
+    (i32.and (i32.const 0x3F))
+    (if (i32.eq (i32.const 4)) ;; has to be match ctx
+        (then nop)
+        (else unreachable)
+    )
+    (call $hexlog (local.get $offset)) (drop)
+
+    ;; offset is in bits
+    (i32.store (i32.add (local.get $ptr) (i32.const 8)) (local.get $offset))
+    (i32.const 1)
+  )
+  (export "minibeam#bs_set_position" (func $bs_set_position))
+
 
 )

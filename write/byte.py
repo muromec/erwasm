@@ -26,6 +26,9 @@ class BsMatch:
     for cmd in self.commands:
       [cmd_name, cmd_args] = cmd
       b + ';; chech {cmd_name}'
+
+      if cmd_name == '\'=:=\'':
+        cmd_name = 'eq'
       fun = getattr(self, f'command_{cmd_name}')
       b += fun(ctx, *cmd_args)
       b += '(if (i32.eqz) (then (br $start)))\n'
@@ -45,10 +48,46 @@ class BsMatch:
         (i32.const {n})
      )\n'''
 
+  def command_ensure_exactly(self, ctx, n):
+    add_import(ctx, 'minibeam', 'bs_ensure_exactly', 1)
+
+    return f'''(call
+        $minibeam_bs_ensure_exactly_1
+        ({ push(ctx, *self.sreg) })
+        (i32.const {n})
+     )\n'''
+
   def command_integer(self, ctx, _xn, _literal, s, n, dreg):
     add_import(ctx, 'minibeam', 'bs_load_integer', 1)
 
     dreg = arg(dreg)
+    return f'''
+      ;; get integer from bs match
+      (i32.shl
+        (call
+          $minibeam_bs_load_integer_1
+          ({ push(ctx, *self.sreg) })
+          (i32.const {s})
+        )
+        (i32.const 4)
+      )
+      (i32.or (i32.const 0xF))
+      ( { pop(ctx, *dreg) } )
+      (i32.const 1)
+     \n'''
+
+  def command_skip(self, ctx, s):
+    add_import(ctx, 'minibeam', 'bs_skip', 1)
+
+    return f'''(call
+        $minibeam_bs_skip_1
+        ({ push(ctx, *self.sreg) })
+        (i32.const {s})
+     )\n'''
+
+  def command_eq(self, ctx, _x, s, value):
+    add_import(ctx, 'minibeam', 'bs_load_integer', 1)
+
     return f'''
       ;; get integer from bs match
       (call 
@@ -56,7 +95,46 @@ class BsMatch:
         ({ push(ctx, *self.sreg) })
         (i32.const {s})
       )
-      ( { pop(ctx, *dreg) } )
-      (i32.const 1)
+      (i32.const {value})
+      (i32.eq)
      \n'''
 
+
+class BsGetPosition:
+  def __init__(self, sarg, darg, _n):
+     self.sreg = arg(sarg)
+     self.dreg = arg(darg)
+
+  def to_wat(self, ctx):
+    add_import(ctx, 'minibeam', 'bs_get_position', 0)
+
+    return f'''
+      ;; get integer from bs_get_position
+      (i32.shl
+        (call
+          $minibeam_bs_get_position_0
+          ({ push(ctx, *self.sreg) })
+        )
+        (i32.const 4)
+      )
+      (i32.or (i32.const 0xF))
+      ( { pop(ctx, *self.dreg) } )
+     \n'''
+
+
+class BsSetPosition:
+  def __init__(self, sarg, darg):
+     self.sreg = arg(sarg)
+     self.dreg = arg(darg)
+
+  def to_wat(self, ctx):
+    add_import(ctx, 'minibeam', 'bs_set_position', 1)
+
+    return f'''
+      ;; pass integer to set position
+      (call
+        $minibeam_bs_set_position_1
+        ({ push(ctx, *self.sreg) })
+        (i32.shr_u ( { push(ctx, *self.dreg) } ) (i32.const 4))
+      )
+     \n'''
