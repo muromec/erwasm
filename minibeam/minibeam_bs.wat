@@ -2,6 +2,7 @@
 
   (import "erdump" "alloc" (func $alloc (param i32 i32) (result i32)))
   (import "erdump" "hexlog" (func $hexlog (param i32) (result i32)))
+  (import "erdump" "write_buf" (func $make_erl_buf (param i32 i32) (result i32)))
 
   ;; inlie the two below
   (func $i16_flip (param $value i32) (result i32)
@@ -336,7 +337,7 @@
         (then nop)
         (else unreachable)
     )
-    (call $hexlog (local.get $offset)) (drop)
+    ;; (call $hexlog (local.get $offset)) (drop)
 
     ;; offset is in bits
     (i32.store (i32.add (local.get $ptr) (i32.const 8)) (local.get $offset))
@@ -344,5 +345,86 @@
   )
   (export "minibeam#bs_set_position" (func $bs_set_position))
 
+  (func $bs_get_binary (param $ctx i32) (param $read_size i32) (result i32)
+    (local $ptr i32)
+    (local $bin_ptr i32)
+    (local $size i32)
+    (local $offset i32)
+    (local $ret i32)
+
+    (if (i32.eq (i32.and (local.get $ctx) (i32.const 2)) (i32.const 2))
+        (then nop)
+        (else unreachable)
+    )
+    (local.set $ptr (i32.shr_u (local.get $ctx) (i32.const 2)))
+
+    (i32.load (local.get $ptr))
+    (i32.and (i32.const 0x3F))
+    (if (i32.eq (i32.const 4)) ;; has to be match ctx
+        (then nop)
+        (else unreachable)
+    )
+
+    (local.get $read_size)
+    (i32.and (i32.const 0xF))
+    (if (i32.eq (i32.const 0xF)) ;; has to be integer
+        (then nop)
+        (else unreachable)
+    )
+    (local.set $read_size
+      (i32.shr_u (local.get $read_size) (i32.const 4))
+    )
+
+    (i32.load (i32.add (local.get $ptr) (i32.const 4)))
+    (local.set $bin_ptr)
+
+    (if (i32.eq (i32.and (local.get $bin_ptr) (i32.const 2)) (i32.const 2))
+        (then nop)
+        (else unreachable)
+    )
+    (local.set $bin_ptr (i32.shr_u (local.get $bin_ptr) (i32.const 2)))
+
+    (i32.load (i32.add (local.get $ptr) (i32.const 8)))
+    (local.set $offset)
+    ;; (call $hexlog (local.get $offset)) (drop)
+
+    (i32.load (local.get $bin_ptr))
+    (i32.and (i32.const 0x3F))
+    (if (i32.eq (i32.const 0x24)) ;; has to be heap binary
+        (then nop)
+        (else unreachable)
+    )
+    (i32.load (i32.add (local.get $bin_ptr) (i32.const 4)))
+    (local.set $size)
+
+    ;; everything above this point should be part of bs_match
+    ;; and done once.
+    ;; the reason its not inlined -- op code writers cant declare
+    ;; local variables right now
+    ;; everything below this point should be inlined instead of making this call
+
+    ;; the size is in bits, add offset in bits to it
+    (local.set $size (i32.sub (local.get $size) (local.get $offset)))
+
+    (call $make_erl_buf
+      (i32.add
+        (i32.shr_u (local.get $offset) (i32.const 3))
+        (i32.add (local.get $bin_ptr) (i32.const 8))
+      )
+      (i32.shr_u (local.get $read_size) (i32.const 3))
+    )
+    (local.set $ret)
+    (if
+      (i32.eqz (local.get $ret))
+      (then (return (i32.const 0)))
+    )
+
+    (local.set $offset (i32.add (local.get $offset) (local.get $read_size)))
+    (i32.store (i32.add (local.get $ptr) (i32.const 8)) (local.get $offset))
+
+    (local.get $ret)
+  )
+
+  (export "minibeam#get_binary_from_ctx" (func $bs_get_binary))
 
 )

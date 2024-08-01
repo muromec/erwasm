@@ -86,43 +86,78 @@ class Test3:
 
 class Test5:
   def __init__(self, test_op, fail_dest, _dn, test_args, dest):
-    assert test_op == 'bs_start_match3'
 
     [_f, [fnumber]] = fail_dest
     assert _f == 'f'
     self.fnumber = fnumber
     self.test_args = test_args
     self.test_op = test_op
-    self.dest = dest
+    self.dreg = arg(dest)
 
   def to_wat(self, ctx):
-    jump = self.fnumber
-
-    add_import(ctx, 'minibeam', 'make_match_context', 1)
-    jump_depth = ctx.labels_to_idx.index(jump)
-    sreg = arg(self.test_args[0])
-    dreg = arg(self.dest)
-
+    jump_depth = ctx.labels_to_idx.index(self.fnumber)
     assert not (jump_depth is None)
 
-    b = f'(local.set $jump (i32.const {jump_depth}));; to label {jump}\n'
-    b += f'''
-      (call
-        $minibeam_make_match_context_1
-        { push(ctx, *sreg) }
-        (i32.const 0)
-      )
-      (local.set $temp)
-      (if (i32.eqz (local.get $temp))
-        (then
-          (br $start)
-        )
-      )
-      (local.get $temp)
-      { pop(ctx, *dreg) }
-    '''
+    b = f'(local.set $jump (i32.const {jump_depth}));; to label {self.fnumber}\n'
+   
+    b += getattr(self, f'test_{self.test_op}')(ctx)
+    b += f'(i32.eqz) (br_if $start)\n'
 
     return b
+
+  def test_bs_start_match3(self, ctx):
+    assert len(self.test_args) == 1
+    [match_ctx_reg] = self.test_args
+    sreg = arg(match_ctx_reg)
+
+    add_import(ctx, 'minibeam', 'make_match_context', 1)
+    return f'''
+      ({ push(ctx, *sreg) })
+      (i32.const 0) ;; do we really need to pass offset?
+      (call $minibeam_make_match_context_1)
+      (local.set $temp)
+      (if (i32.eqz (local.get $temp))
+        (then (nop))
+        (else
+          (local.get $temp)
+          { pop(ctx, *self.dreg) }
+        )
+      )
+      (i32.eqz (local.get $temp))
+      (i32.eqz)
+    '''
+
+  def test_bs_get_binary2(self, ctx):
+    add_import(ctx, 'minibeam', 'get_binary_from_ctx', 2)
+
+    [_tr, [match_ctx_reg, [_reg_type, _n]]] = self.test_args[0]
+    assert _tr == 'tr'
+    assert _reg_type == 't_bs_context'
+    [_tr, [size_reg, [_reg_type, _n]]] = self.test_args[1]
+    assert _tr == 'tr'
+    assert _reg_type == 't_integer'
+
+    assert self.test_args[2] == 8
+
+    sreg1 = arg(match_ctx_reg)
+    sreg2 = arg(size_reg)
+
+    return f'''
+      ({ push(ctx, *sreg1) })
+      ({ push(ctx, *sreg2) })
+      (call $minibeam_get_binary_from_ctx_2)
+      (local.set $temp)
+      (if (i32.eqz (local.get $temp))
+        (then (nop))
+        (else
+          (local.get $temp)
+          { pop(ctx, *self.dreg) }
+        )
+      )
+      (i32.eqz (local.get $temp))
+      (i32.eqz)
+
+    '''
 
 
 class Test:

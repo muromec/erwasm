@@ -20,7 +20,7 @@ class BsMatch:
   def to_wat(self, ctx):
     jump_depth = ctx.labels_to_idx.index(self.fnumber)
 
-    b = ';; bs_match or fail to {self.fnumber}\n'
+    b = f';; bs_match or fail to {self.fnumber}\n'
     b += f'(local.set $jump (i32.const {jump_depth}));; to label {self.fnumber}\n'
 
     for cmd in self.commands:
