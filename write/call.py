@@ -60,10 +60,10 @@ class ExternalCall(LocalCall):
     if ignore_call(self.ext_mod, self.ext_fn):
       return ''
 
-    b = add_import(ctx, self.ext_mod, self.ext_fn, self.arity)
+    add_import(ctx, self.ext_mod, self.ext_fn, self.arity)
     ctx.max_xregs = max(ctx.max_xregs, self.arity)
 
-    return b + f'call ${self.ext_mod}_{self.ext_fn}_{arity}\n'
+    return f'call ${self.ext_mod}_{self.ext_fn}_{self.arity}\n'
 
 class ExternalCallDrop(ExternalCall):
   def to_wat(self, ctx):

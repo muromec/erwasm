@@ -1,4 +1,9 @@
-from write.utils import move
+from write.utils import move, push, pop
+
+def arg(value):
+  [typ, [num]] = value
+  assert typ in ('x', 'y')
+  return typ, int(num)
 
 class Allocate:
   def __init__(self, yreg, xreg):
@@ -32,3 +37,18 @@ class VariableMetaNop:
   def to_wat(self, ctx):
     return ''
 
+class Swap:
+  def __init__(self, sarg, darg):
+    self.sreg = arg(sarg)
+    self.dreg = arg(darg)
+
+  def to_wat(self, ctx):
+    return f'''
+    ({ push(ctx, *self.sreg) })
+    (local.set $temp)
+    ({ push(ctx, *self.dreg) })
+    ({ pop(ctx, *self.sreg) })
+
+    (local.get $temp)
+    ({ pop(ctx, *self.dreg) })
+    '''

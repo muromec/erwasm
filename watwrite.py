@@ -4,17 +4,17 @@ from write.line import Line
 from write.jump import Jump
 from write.move import Move
 from write.test import Test
-from write.byte import BsMatch, BsGetPosition, BsSetPosition
+from write.byte import BsMatch, BsGetPosition, BsSetPosition, BsGetTail
 from write.ret import Ret
 from write.select_val import SelectVal
-from write.list import GetList, GetHead, GetTail
+from write.list import GetList, GetHead, GetTail, PutList
 from write.call import (
   LocalCall, LocalCallDrop, LocalCallTail,
   ExternalCall, ExternalCallDrop, ExternalCallTail,
 )
 from write.bif import Bif
 from write.block import Label, FuncInfo, BadMatch
-from write.regs import Allocate, Trim, VariableMetaNop
+from write.regs import Allocate, Trim, VariableMetaNop, Swap
 from write.proc import Send
 
 from write.utils import make_result_n, make_in_params_n
@@ -38,7 +38,7 @@ FUNC = '''
 )
 '''
 FUNC_EXPORT = '''
-(export "{mod}#{name}-a{arity}" (func ${name}_{arity}))
+(export "{mod}#{name}_{arity}" (func ${name}_{arity}))
 '''
 
 LITERAL = '''
@@ -123,12 +123,16 @@ def produce_wasm(module):
         'bs_match': BsMatch,
         'bs_get_position': BsGetPosition,
         'bs_set_position': BsSetPosition,
+        'bs_get_tail': BsGetTail,
         'return': Ret,
         'select_val': SelectVal,
         'badmatch': BadMatch,
 
+        'put_list': PutList,
+
         'allocate': Allocate,
         'trim': Trim,
+        'swap': Swap,
         '\'%\'': VariableMetaNop,
 
         'get_list': GetList,

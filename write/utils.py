@@ -1,7 +1,7 @@
 from codecs import decode
 
 FUNC_IMPORT = '''
-(import "{mod}" "{fn}" (func ${mod}_{fn}_{arity} {params} (result i32)))
+(import "{mod}" "{fn}_{arity}" (func ${mod}_{fn}_{arity} {params} (result i32)))
 '''
 
 LITERAL = '''
@@ -137,8 +137,12 @@ def move(ctx, styp, snum, dtyp, dnum):
   pop(ctx, dryp, dnum)
 
 def populate_stack_with(ctx, value):
+  if value == 'nil':
+    return '(i32.const 0x3b)\n'
+
   if value[0] == 'tr':
     value = value[1][0]
+
   [typ, [val]] = value
   b = ''
   if typ == 'integer':
@@ -160,3 +164,8 @@ def populate_with(ctx, dtyp, dnum, value):
   b = populate_stack_with(ctx, value)
   b += f'(local.set $var_{dtyp}reg_{dnum}_val)\n'
   return b
+
+def arg(value):
+  [typ, [num]] = value
+  assert typ in ('x', 'y')
+  return typ, int(num)

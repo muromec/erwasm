@@ -1,9 +1,4 @@
-from write.utils import push, pop, add_import
-
-def arg(value):
-  [typ, [num]] = value
-  assert typ in ('x', 'y')
-  return typ, int(num)
+from write.utils import push, pop, add_import, arg
 
 class BsMatch:
   def __init__(self, fail_dest, sarg, command_table):
@@ -124,8 +119,8 @@ class BsGetPosition:
 
 class BsSetPosition:
   def __init__(self, sarg, darg):
-     self.sreg = arg(sarg)
-     self.dreg = arg(darg)
+    self.sreg = arg(sarg)
+    self.dreg = arg(darg)
 
   def to_wat(self, ctx):
     add_import(ctx, 'minibeam', 'bs_set_position', 1)
@@ -137,4 +132,23 @@ class BsSetPosition:
         ({ push(ctx, *self.sreg) })
         (i32.shr_u ( { push(ctx, *self.dreg) } ) (i32.const 4))
       )
+     \n'''
+
+
+class BsGetTail:
+  def __init__(self, sarg, darg, max_regs):
+    self.sreg = arg(sarg)
+    self.dreg = arg(darg)
+    self.max_regs = max_regs
+
+  def to_wat(self, ctx):
+    add_import(ctx, 'minibeam', 'bs_get_tail', 0)
+
+    return f'''
+      ;; get tail bytes from context
+      (call
+        $minibeam_bs_get_tail_0
+        ({ push(ctx, *self.sreg) })
+      )
+      ( { pop(ctx, *self.dreg) } )
      \n'''
