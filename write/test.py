@@ -24,12 +24,12 @@ class Test3:
       b += populate_stack_with(ctx, arg)
 
     b += f' ;; test {self.test_op} and jump to {jump}\n'
-    b += {
+    test = {
       'is_lt': 'i32.lt_u\n',
       'is_le': 'i32.le_u\n',
       'is_gt': 'i32.gt_u\n',
       'is_ge': 'i32.ge_u\n',
-      'is_eq_exact': 'i32.eq\n',
+      'is_eq_exact': self.test_eq_exact,
       'is_atom': '''
         (i32.and (i32.const 0x3F))
         (i32.eq (i32.const 0xB))
@@ -82,11 +82,21 @@ class Test3:
       '''
     }[self.test_op]
 
+    if callable(test):
+      test = test(ctx)
+
+    b += test
+
     # erlang test condition jump is inverted
     # jump to the label specified if the condition fails
     b += f'(i32.eqz) (br_if $start)\n'
 
     return b
+
+  def test_eq_exact(self, ctx):
+    add_import(ctx, 'minibeam', 'test_eq_exact', 2)
+
+    return '(call $minibeam_test_eq_exact_2)\n'
 
 class Test5:
   def __init__(self, test_op, fail_dest, _dn, test_args, dest):
