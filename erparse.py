@@ -1,22 +1,35 @@
 from ermod import make_module
 
+class Atom(str):
+  def __repr__(self):
+    return f'<atom: {str(self)}>'
 
 def is_num(value):
   return '0' <= value <= '9'
 
 def is_atom(value):
-  return 'a' <= value <= 'z' or value == '_'
+  return ('a' <= value <= 'z') or value == '_' or ('0' <= value <= '9')
 
-def parse_list_sentence_helper(text, State):
+def is_atom_start(value):
+  return 'a' <= value <= 'z'
+
+def parse_list_sentence_helper(text, State, end_token, depth):
+  # print('\t' * depth, 'down at', depth, State.idx)
   ret = []
   state = None
   acc = ''
   while State.idx < len(text):
     symbol = text[State.idx]
+    # print('helper', State.idx, symbol, state)
     State.idx += 1
 
     if state == None and symbol == '{':
-      child_sentence = parse_sentence_helper(text, State)
+      child_sentence = parse_sentence_helper(text, State, depth = depth + 1)
+      # print('c', child_sentence)
+      ret.append(child_sentence)
+    elif state == None and symbol == '[':
+      child_sentence = parse_list_sentence_helper(text, State, ']', depth = depth + 1)
+      # print('c', child_sentence)
       ret.append(child_sentence)
     elif state == None and is_num(symbol):
       state = 'num'
@@ -26,19 +39,46 @@ def parse_list_sentence_helper(text, State):
     elif state == 'num' and not is_num(symbol):
       ret.append(int(acc))
       state = None
+    elif state == None and is_atom_start(symbol):
+      acc = symbol
+      state = 'atom'
+    elif state == 'atom' and is_atom(symbol):
+      acc += symbol
+    elif state == 'atom' and not is_atom(symbol):
+      ret.append(Atom(acc))
+      acc = None
+      state = None
+    elif state == None and symbol == '\'':
+      state = 'atom_quote'
+      acc = ''
+    elif state == 'atom_quote' and symbol == '\'':
+      ret.append(Atom(acc))
+      acc = None
+      state = None
+    elif state == 'atom_quote':
+      acc += symbol
     elif state == None and symbol == '"':
       state = 'str'
       acc = ''
     elif state == 'str' and symbol == '"':
       ret.append(acc)
+      state = None
+      acc = ''
     elif state == 'str' and symbol != '"':
       acc += symbol
     elif state == None and symbol in ['[']:
       assert False, 'cant be!'
 
-    if symbol == ']':
+    if symbol == end_token:
       break
 
+  if acc and state == 'num':
+    ret.append(int(acc))
+
+  if acc and state == 'atom':
+    ret.append(Atom(acc))
+
+  # print('\t' * depth, 'up at', State.idx)
   return ret
 
 
@@ -47,54 +87,16 @@ def clean_v(value):
     value = value[1:-1]
   return value
 
-def parse_sentence_helper(text, State):
-  state = 'name'
-  sentence = None
-  name = ''
-  children = []
-  arg_name = ''
-  literal = ''
+def parse_sentence_helper(text, State, depth):
+  child_sentence = parse_list_sentence_helper(text, State, '}', depth = depth + 1)
+  # print('c', '\t' * depth, child_sentence)
+  # TODO: remove this
+  if isinstance(child_sentence[0], Atom):
+    child_sentence_old = (child_sentence[0], list(child_sentence[1:]))
+    return child_sentence_old
 
-  while State.idx < len(text):
-    symbol = text[State.idx]
-    State.idx += 1
-    if symbol == '}':
-      break
-    elif state == 'name' and symbol not in [' ', ',']:
-      name += symbol
-    elif state == 'name':
-      state = None
-    elif state == None and symbol in [' ', ',']:
-      pass
-    elif state == None and symbol == '[':
-      child_sentence = parse_list_sentence_helper(text, State)
-      children.append(child_sentence)
-    elif state == None and symbol == '"':
-      literal = ''
-      state = 'inside_literal'
-    elif state == None and symbol == '{':
-      child_sentence = parse_sentence_helper(text, State)
-      children.append(child_sentence)
-    elif state == None and symbol not in [' ', '\n']:
-      state = 'arg_name'
-      arg_name = symbol
-    elif state == 'arg_name' and symbol in [' ', ',']:
-      children.append(clean_v(arg_name))
-      state = None
-      arg_name = None
-    elif state == 'arg_name':
-      arg_name += symbol
-    elif state == 'inside_literal' and symbol == '"':
-      state = None
-      children.append(literal)
-    elif state == 'inside_literal':
-      literal += symbol
+  return child_sentence
 
-    
-  if arg_name:
-    children.append(clean_v(arg_name))
-
-  return name, children
 
 def parse_sentence(text):
   class State:
@@ -106,7 +108,7 @@ def parse_sentence(text):
   if text == 'send':
     return 'send', []
 
-  return parse_sentence_helper(text, State)
+  return parse_sentence_helper(text, State, depth=0)
 
 
 def parse_beam(text):
@@ -153,7 +155,7 @@ def parse(beam_text):
 def main(fname):
   with open(fname, 'r') as beam_text_f:
     mod = parse(beam_text_f.read())
-    print('mod', mod)
+    # print('mod', mod)
 
 if __name__ == '__main__':
   import sys

@@ -30,6 +30,10 @@ class Test3:
       'is_gt': 'i32.gt_u\n',
       'is_ge': 'i32.ge_u\n',
       'is_eq_exact': 'i32.eq\n',
+      'is_atom': '''
+        (i32.and (i32.const 0x3F))
+        (i32.eq (i32.const 0xB))
+      ''',
       'is_nil': '''
         (local.set $temp)
         (loop $loop
@@ -65,8 +69,8 @@ class Test3:
             (local.get $temp)
             (i32.shr_u (i32.const 2))
             (i32.load)
-            (i32.and (i32.const 3))
-            (i32.eq (i32.const 1))
+            (i32.eq (i32.const 0x3b))
+            (i32.eqz)
             (local.set $temp)
           )
           (else

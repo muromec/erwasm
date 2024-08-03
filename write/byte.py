@@ -1,4 +1,4 @@
-from write.utils import push, pop, add_import, arg
+from write.utils import push, pop, add_import, arg, populate_with
 
 class BsMatch:
   def __init__(self, fail_dest, sarg, command_table):
@@ -22,7 +22,7 @@ class BsMatch:
       [cmd_name, cmd_args] = cmd
       b + ';; chech {cmd_name}'
 
-      if cmd_name == '\'=:=\'':
+      if cmd_name == '=:=':
         cmd_name = 'eq'
       fun = getattr(self, f'command_{cmd_name}')
       b += fun(ctx, *cmd_args)
@@ -152,3 +152,23 @@ class BsGetTail:
       )
       ( { pop(ctx, *self.dreg) } )
      \n'''
+
+class BsStartMatch:
+  def __init__(self, params, max_regs, sarg, darg):
+    self.sarg = sarg
+    self.sreg = arg(sarg)
+    self.dreg = arg(darg)
+    self.max_regs = max_regs
+    [_a, [_resume]] = params
+    assert _a == 'atom'
+    assert _resume == 'resume'
+
+  def to_wat(self, ctx):
+    b = f';; bs_start_match4 {self.sreg} -> {self.dreg}\n'
+    # if source and dest are the same, do nothing
+    # normally ref count should be here
+    if self.sreg == self.dreg:
+      b += ';; nop\n'
+      return b
+
+    return b + populate_with(ctx, *self.dreg, self.sarg)

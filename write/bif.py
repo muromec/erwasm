@@ -16,13 +16,13 @@ class Bif:
 
   def make_test(self):
     b = ''
-    if self.op == "'+'":
+    if self.op == "+":
       b += '(i32.xor (i32.const 0xF))\n'
       b += '(i32.add)\n'
-    elif self.op ==  "'-'":
+    elif self.op ==  "-":
       b += '(i32.xor (i32.const 0xF))\n'
       b += '(i32.sub)\n'
-    elif self.op == "'*'":
+    elif self.op == "*":
       b += '''
       (i32.shr_u (i32.xor (i32.const 0xF)) (i32.const 4))
       (local.set $temp)
@@ -34,7 +34,7 @@ class Bif:
       (i32.or (i32.const 0xF))
       '''
     else:
-      assert False, f'unknown bif {op}'
+      assert False, f'unknown bif {self.op}'
 
     return b
 

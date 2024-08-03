@@ -4,7 +4,7 @@ from write.line import Line
 from write.jump import Jump
 from write.move import Move
 from write.test import Test
-from write.byte import BsMatch, BsGetPosition, BsSetPosition, BsGetTail
+from write.byte import BsStartMatch, BsMatch, BsGetPosition, BsSetPosition, BsGetTail
 from write.ret import Ret
 from write.select_val import SelectVal
 from write.list import GetList, GetHead, GetTail, PutList
@@ -58,6 +58,9 @@ def produce_wasm(module):
   class Ctx:
     labels_to_idx = []
     imports = []
+    atoms = {
+    }
+    last_atom_id = 0
     data = ''
     literalidx = 4
 
@@ -67,6 +70,16 @@ def produce_wasm(module):
     find_function = module.find_function
 
     depth = 0
+
+    @classmethod
+    def resolve_atom(cls, atom_name):
+      if atom_name in cls.atoms:
+        return cls.atoms[atom_name]
+
+      cls.last_atom_id += 1
+      atom_id = cls.last_atom_id
+      cls.atoms[atom_name] = atom_id
+      return atom_id
 
   for func in module.functions:
     Ctx.max_xregs = max(int(func.arity), 1)
@@ -91,7 +104,7 @@ def produce_wasm(module):
       if statement[0] == 'label'
     ])
     labels_to_idx = labels[:]
-    jump_depth = labels_to_idx.index(str(func.start_label))
+    jump_depth = labels_to_idx.index(func.start_label)
 
     b += f'(local.set $jump (i32.const {jump_depth}))\n'
     labels0 = list(map(str,range(0, len(labels))))
@@ -120,6 +133,7 @@ def produce_wasm(module):
         'jump': Jump,
         'move': Move,
         'test': Test,
+        'bs_start_match4': BsStartMatch,
         'bs_match': BsMatch,
         'bs_get_position': BsGetPosition,
         'bs_set_position': BsSetPosition,
@@ -133,7 +147,7 @@ def produce_wasm(module):
         'allocate': Allocate,
         'trim': Trim,
         'swap': Swap,
-        '\'%\'': VariableMetaNop,
+        '%': VariableMetaNop,
 
         'get_list': GetList,
         'get_hd': GetHead,

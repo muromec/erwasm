@@ -52,9 +52,8 @@ class GetList:
             )
           )
 
-          (i32.load (local.get $temp))
-          (i32.and (i32.const 3))
 
+          (i32.load (local.get $temp))
           (if
             (i32.eq (i32.const 0x3b))
             (then
@@ -161,8 +160,6 @@ class GetTail:
           )
 
           (i32.load (local.get $temp))
-          (i32.and (i32.const 3))
-
           (if
             (i32.eq (i32.const 0x3b))
             (then

@@ -30,7 +30,7 @@
           (i32.store ;; 0
             (local.get $ptr)
             ;; list pointer to skip over next 4 bytes
-            (i32.or (i32.shl (i32.const 4) (i32.const 2)) (i32.const 1))
+            (i32.or (i32.shl (i32.const 8) (i32.const 2)) (i32.const 1))
           )
           (local.set $ptr (i32.add (i32.const 4) (local.get $ptr)))
 
@@ -68,7 +68,6 @@
         )
       )
 
-      (call $hexlog (i32.const 0))
       (unreachable)
     )
 

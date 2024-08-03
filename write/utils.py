@@ -1,4 +1,5 @@
 from codecs import decode
+from erparse import Atom
 
 FUNC_IMPORT = '''
 (import "{mod}" "{fn}_{arity}" (func ${mod}_{fn}_{arity} {params} (result i32)))
@@ -51,50 +52,83 @@ def pad(n):
     return '0' + n
   return n
 
-def make_len(n):
+
+def escape_bin(byte_list):
+  ret = ''
+  for b_value in byte_list:
+    b_value_s = pad(hex(b_value)[2:])
+    ret += f'\\{b_value_s}'
+
+  return ret
+
+def make_word(n):
   len3 = n & 0xFF
   len2 = (n >> 8) & 0xFF
   len1 = (n >> 16) & 0xFF
   len0 = (n >> 24) & 0xFF
+  return [len3, len2, len1, len0]
 
-  len0s = pad(hex(len0)[2:])
-  len1s = pad(hex(len1)[2:])
-  len2s = pad(hex(len2)[2:])
-  len3s = pad(hex(len3)[2:])
-
-  ret = f'\\{len3s}\\{len2s}\\{len1s}\\{len0s}'
-  return ret
 
 def fix_string(value):
   return  decode(value, 'unicode-escape')
 
-def pack_literal(value):
+def pack_reg_value(ctx, value):
+  if isinstance(value, Atom):
+    atom_id = ctx.resolve_atom(str(value))
+    return (atom_id << 6 | 0xB)
+
   if isinstance(value, int):
-    return (make_len(value), 0)
+    return (value << 4 | 0xF)
+
+  assert False, ('unknown typ', value, type(value))
+
+def fix_tuple(value):
+  if len(value) == 2 and isinstance(value[1], list):
+    value = (value[0],) + tuple(value[1])
+  value = tuple((
+    fix_tuple(item) if isinstance(item, tuple) else item
+    for item in value
+  ))
+  return value
+
+def pack_literal(ctx, value):
+  if isinstance(value, Atom) or isinstance(value, int):
+    return make_word(pack_reg_value(ctx, value))
 
   if isinstance(value, str):
     value = list(map(ord, fix_string(value)))
 
   if isinstance(value, list):
-    # print('pack literal', repr(value))
-    assert all(map(lambda v: isinstance(v, int), value)), 'Only list of ints'
-    ret = ''
-    for int_value in value:
-      ret += make_len(8 << 2 | 1)
-      ret += make_len(int_value << 4 | 0xF)
+    value = [
+      pack_literal(ctx, item)
+      for item in value
+    ]
+    ret = []
+    for s_value in value:
+      s_len = len(s_value) + 4
+      ret += make_word(s_len << 2 | 1)
+      ret += s_value
 
-    ret += make_len(0x3b)
-    ret += make_len(0)
+    ret += make_word(0x3b)
+    ret += make_word(0)
+
+    return ret
+
+  if isinstance(value, tuple):
+    value = fix_tuple(value)
+    ret = make_word(len(value) << 6)
+    for s_value in value:
+      ret += make_word(pack_reg_value(ctx, s_value))
 
     return ret
 
   assert False, f'cant pack as constant value {value}'
 
 def add_literal(ctx, sval):
-  packed_value = pack_literal(sval)
+  packed_value = pack_literal(ctx, sval)
   ctx.data += LITERAL.format(
     offset = ctx.literalidx,
-    value = packed_value,
+    value = escape_bin(packed_value),
   )
   name = f'__{ctx.literalidx}__literal_ptr_raw'
   ctx.data += GLOBAL_CONST.format(
@@ -133,8 +167,9 @@ def pop(ctx, typ, num):
 
 
 def move(ctx, styp, snum, dtyp, dnum):
-  push(ctx, styp, snum)
-  pop(ctx, dryp, dnum)
+  b = push(ctx, styp, snum)
+  b += pop(ctx, dryp, dnum)
+  return b
 
 def populate_stack_with(ctx, value):
   if value == 'nil':
@@ -143,16 +178,20 @@ def populate_stack_with(ctx, value):
   if value[0] == 'tr':
     value = value[1][0]
 
+  if value[0] == 'literal' and value[1] == []:
+    value= (value[0], [[]])
+
   [typ, [val]] = value
   b = ''
   if typ == 'integer':
-    val = (int(val) << 4 | 0xF)
-    b += f'(i32.const {val})\n'
+    pval = pack_reg_value(ctx, int(val))
+    b += f'(i32.const {pval})\n'
+  elif typ == 'atom':
+    pval = pack_reg_value(ctx, Atom(val))
+    b += f'(i32.const {pval}) ;; atom {val}\n'
   elif typ == 'literal':
     literal_name = add_literal(ctx, val)
     b += f'(global.get ${literal_name})\n'
-  elif typ == 'atom':
-    b += f'(i32.const 0)\n' # TODO: implement atoms
   elif typ == 'x' or typ == 'y':
     b += push(ctx, typ, int(val))
   else:
