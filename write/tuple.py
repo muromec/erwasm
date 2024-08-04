@@ -30,3 +30,51 @@ class PutTuple2:
 
 
     return b
+
+class GetTupleElement:
+  def __init__(self, sreg, offset, dreg):
+    self.dreg = arg(dreg)
+    self.sreg = arg(sreg)
+    self.offset = offset
+
+  def to_wat(self, ctx):
+    b = f';; get_tuple_element {self.offset}\n'
+    b += f'''
+      { push(ctx, *self.sreg) }
+      (local.set $temp)
+
+      (local.get $temp)
+      (i32.and (i32.const 3))
+      (if
+        (i32.eq (i32.const 2)) ;; mem ref
+        (then
+          (i32.shr_u (local.get $temp) (i32.const 2))
+          (local.set $temp) ;; raw pointer to tuple head
+
+          (i32.load (local.get $temp))
+          (i32.and (i32.const 0x3f))
+
+          (if
+            (i32.eqz) ;; is tuple
+            (then
+              (local.get $temp)
+              (i32.const {4 + (self.offset) * 4})
+              (i32.add)
+              (i32.load) ;; load element {self.offset}
+              (local.set $temp)
+            )
+            (else ;; not a tuple
+              (unreachable)
+            )
+          )
+        )
+        (else ;; not a mem ref
+          (unreachable)
+        )
+      )
+      (local.get $temp)
+      { pop(ctx, *self.dreg) }
+    ;; end get tuple element
+    '''
+    return b
+

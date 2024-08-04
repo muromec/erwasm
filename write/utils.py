@@ -74,7 +74,7 @@ def fix_string(value):
 
 def pack_reg_value(ctx, value):
   if isinstance(value, Atom):
-    atom_id = ctx.resolve_atom(str(value))
+    (_atom_name, atom_id) = ctx.register_atom(str(value))
     return (atom_id << 6 | 0xB)
 
   if isinstance(value, int):
@@ -91,7 +91,7 @@ def fix_tuple(value):
   ))
   return value
 
-def pack_literal(ctx, value):
+def pack_literal(ctx, value, base_offset):
   if isinstance(value, Atom) or isinstance(value, int):
     return make_word(pack_reg_value(ctx, value))
 
@@ -100,7 +100,7 @@ def pack_literal(ctx, value):
 
   if isinstance(value, list):
     value = [
-      pack_literal(ctx, item)
+      pack_literal(ctx, item, base_offset)
       for item in value
     ]
     ret = []
@@ -125,7 +125,7 @@ def pack_literal(ctx, value):
   assert False, f'cant pack as constant value {value}'
 
 def add_literal(ctx, sval):
-  packed_value = pack_literal(ctx, sval)
+  packed_value = pack_literal(ctx, sval, base_offset = ctx.literalidx)
   ctx.data += LITERAL.format(
     offset = ctx.literalidx,
     value = escape_bin(packed_value),
@@ -187,8 +187,10 @@ def populate_stack_with(ctx, value):
     pval = pack_reg_value(ctx, int(val))
     b += f'(i32.const {pval})\n'
   elif typ == 'atom':
-    pval = pack_reg_value(ctx, Atom(val))
-    b += f'(i32.const {pval}) ;; atom {val}\n'
+    # print('v', val)
+    (atom_name, _atom_id) = ctx.register_atom(str(val))
+    # pval = pack_reg_value(ctx, Atom(val))
+    b += f'(global.get $__unique_atom__{str(atom_name)}) ;; atom {val}\n'
   elif typ == 'literal':
     literal_name = add_literal(ctx, val)
     b += f'(global.get ${literal_name})\n'
@@ -208,3 +210,11 @@ def arg(value):
   [typ, [num]] = value
   assert typ in ('x', 'y')
   return typ, int(num)
+
+
+def get_atoms(ctx):
+  b = ';; atoms table\n'
+  for (key, value) in ctx.atoms.items():
+    b += GLOBAL_CONST.format(name=f'__unique_atom__{key}', value=value)
+
+  return b

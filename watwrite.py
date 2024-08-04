@@ -8,7 +8,7 @@ from write.byte import BsStartMatch, BsMatch, BsGetPosition, BsSetPosition, BsGe
 from write.ret import Ret
 from write.select_val import SelectVal
 from write.list import GetList, GetHead, GetTail, PutList
-from write.tuple import PutTuple2
+from write.tuple import PutTuple2, GetTupleElement
 from write.call import (
   LocalCall, LocalCallDrop, LocalCallTail,
   ExternalCall, ExternalCallDrop, ExternalCallTail,
@@ -18,7 +18,7 @@ from write.block import Label, FuncInfo, BadMatch
 from write.regs import Allocate, Trim, VariableMetaNop, Swap
 from write.proc import Send
 
-from write.utils import make_result_n, make_in_params_n
+from write.utils import make_result_n, make_in_params_n, get_atoms
 
 
 MODULE = '''(module
@@ -73,14 +73,15 @@ def produce_wasm(module):
     depth = 0
 
     @classmethod
-    def resolve_atom(cls, atom_name):
+    def register_atom(cls, atom_name):
       if atom_name in cls.atoms:
-        return cls.atoms[atom_name]
+        atom_id = cls.atoms[atom_name]
+        return (atom_name, atom_id)
 
       cls.last_atom_id += 1
       atom_id = cls.last_atom_id
       cls.atoms[atom_name] = atom_id
-      return atom_id
+      return (atom_name, atom_id)
 
   for func in module.functions:
     Ctx.max_xregs = max(int(func.arity), 1)
@@ -145,6 +146,7 @@ def produce_wasm(module):
 
         'put_list': PutList,
         'put_tuple2': PutTuple2,
+        'get_tuple_element': GetTupleElement,
 
         'allocate': Allocate,
         'trim': Trim,
@@ -199,7 +201,7 @@ def produce_wasm(module):
     )
   data = MEM_NEXT_FREE.format(
     offset=Ctx.literalidx,
-  ) + Ctx.data
+  ) + Ctx.data + get_atoms(Ctx)
   return MODULE.format(
     name=module.name,
     imports="\n".join(Ctx.imports),

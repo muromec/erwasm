@@ -19,17 +19,99 @@ class Test3:
     jump_depth = ctx.labels_to_idx.index(jump)
     assert not (jump_depth is None)
     b = f'(local.set $jump (i32.const {jump_depth}));; to label {jump}\n'
+    b += f' ;; test {self.test_op} and jump to {jump}\n'
 
+    test = getattr(self, f'test_{self.test_op}', self.test_common)
+
+    b += test(ctx)
+
+    # erlang test condition jump is inverted
+    # jump to the label specified if the condition fails
+    b += f'(i32.eqz) (br_if $start)\n'
+
+    return b
+
+  def load_args_to_stack(self, ctx):
+    b = ''
     for arg in self.test_args:
       b += populate_stack_with(ctx, arg)
 
-    b += f' ;; test {self.test_op} and jump to {jump}\n'
-    test = {
+    return b
+
+  def test_is_eq_exact(self, ctx):
+    b = self.load_args_to_stack(ctx)
+    add_import(ctx, 'minibeam', 'test_eq_exact', 2)
+
+    return b + '(call $minibeam_test_eq_exact_2)\n'
+
+  def test_is_tagged_tuple(self, ctx):
+    [sarg, tuple_arity, tag_atom] = self.test_args
+    assert tag_atom[0] == 'atom'
+    add_import(ctx, 'erdump', 'hexlog', 1)
+
+    b = f'''
+      ; test is_tagged_tuple
+      { populate_stack_with(ctx, sarg) }
+      (local.set $temp)
+
+
+      (local.get $temp)
+      (i32.and (i32.const 3))
+      (if
+        (i32.eq (i32.const 2)) ;; mem ref
+        (then
+          (local.get $temp)
+          (i32.shr_u (i32.const 2))
+          (local.set $temp) ;; raw pointer to tuple head
+
+
+          (i32.load (local.get $temp))
+          (i32.and (i32.const 0x3f))
+
+          (if
+            (i32.eqz) ;; is tuple
+            (then
+
+              (i32.load (local.get $temp))
+              (i32.const 6)
+              (i32.shr_u)
+              (if
+                (i32.eq (i32.const {tuple_arity}))
+                (then
+                  (i32.load (i32.add (local.get $temp) (i32.const 4)))
+
+                  { populate_stack_with(ctx, tag_atom) }
+
+                  (local.set $temp (i32.eq))
+                )
+                (else ;; not the right arity
+                  (local.set $temp (i32.const 0))
+                )
+              )
+            )
+            (else ;; not a tuple
+              (local.set $temp (i32.const 0))
+            )
+          )
+        )
+        (else ;; not a mem ref
+          (local.set $temp (i32.const 0))
+        )
+      )
+      (local.get $temp)
+
+
+    '''
+    return b
+
+  def test_common(self, ctx):
+    b = self.load_args_to_stack(ctx)
+
+    return b + ({
       'is_lt': 'i32.lt_u\n',
       'is_le': 'i32.le_u\n',
       'is_gt': 'i32.gt_u\n',
       'is_ge': 'i32.ge_u\n',
-      'is_eq_exact': self.test_eq_exact,
       'is_atom': '''
         (i32.and (i32.const 0x3F))
         (i32.eq (i32.const 0xB))
@@ -80,23 +162,8 @@ class Test3:
         )
         (local.get $temp)
       '''
-    }[self.test_op]
+    }[self.test_op])
 
-    if callable(test):
-      test = test(ctx)
-
-    b += test
-
-    # erlang test condition jump is inverted
-    # jump to the label specified if the condition fails
-    b += f'(i32.eqz) (br_if $start)\n'
-
-    return b
-
-  def test_eq_exact(self, ctx):
-    add_import(ctx, 'minibeam', 'test_eq_exact', 2)
-
-    return '(call $minibeam_test_eq_exact_2)\n'
 
 class Test5:
   def __init__(self, test_op, fail_dest, _dn, test_args, dest):

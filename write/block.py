@@ -1,3 +1,4 @@
+from write.utils import add_import
 
 class Label:
   def __init__(self, fnumber):
@@ -24,6 +25,11 @@ class BadMatch:
     pass
 
   def to_wat(self, ctx):
-    return 'unreachable ;; badmatch trap\n'
+    add_import(ctx, 'erdump', 'hexlog', 1)
+
+    return '''
+      (call $erdump_hexlog_1 (i32.const 0xDEAD_0BAD))
+      unreachable ;; badmatch trap
+    '''
 
 
