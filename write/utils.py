@@ -106,7 +106,8 @@ def pack_literal(ctx, value, base_offset):
     ret = []
     for s_value in value:
       s_len = len(s_value) + 4
-      ret += make_word(s_len << 2 | 1)
+      base_offset += s_len
+      ret += make_word(base_offset << 2 | 1)
       ret += s_value
 
     ret += make_word(0x3b)

@@ -37,16 +37,8 @@ class GetList:
               (i32.load (i32.add (i32.const 4) (local.get $temp)))
               { pop_head } ;; head
 
-              (i32.add
-                (i32.shr_u
-                  (i32.load (local.get $temp))
-                  (i32.const 2)
-                )
-                (local.get $temp)
-              )
-              (i32.const 2)
-              (i32.shl)
-              (i32.or (i32.const 2))
+              (i32.load (local.get $temp))
+              (i32.xor (i32.const 3))
               { pop_tail }
               (br $get_list) ;; return ref to next element
             )
@@ -144,16 +136,8 @@ class GetTail:
           (i32.and (i32.const 3))
           (if (i32.eq (i32.const 1))
             (then
-              (i32.add
-                (i32.shr_u
-                  (i32.load (local.get $temp))
-                  (i32.const 2)
-                )
-                (local.get $temp)
-              )
-              (i32.const 2)
-              (i32.shl)
-              (i32.or (i32.const 2))
+              (i32.load (local.get $temp))
+              (i32.xor (i32.const 3))
               { pop_tail }
               (br $get_tail) ;; return ref to next element
             )

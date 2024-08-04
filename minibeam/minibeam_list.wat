@@ -26,12 +26,14 @@
           (call $alloc (i32.const 4) (i32.const 16))
           (local.set $ptr)
           (local.set $ret (local.get $ptr))
+          (local.set $tail_ptr (i32.add (local.get $tail_ptr) (i32.const 8)))
 
-          (i32.store ;; 0
-            (local.get $ptr)
-            ;; list pointer to skip over next 4 bytes
-            (i32.or (i32.shl (i32.const 8) (i32.const 2)) (i32.const 1))
-          )
+          (i32.shl (local.get $tail_ptr) (i32.const 2))
+          (i32.or (i32.const 1))
+          (local.set $tail)
+
+          ;; 0
+          (i32.store (local.get $ptr) (local.get $tail))
           (local.set $ptr (i32.add (i32.const 4) (local.get $ptr)))
 
           (i32.store (local.get $ptr) (local.get $head)) ;; 1
@@ -48,19 +50,12 @@
           (local.set $ptr)
           (local.set $ret (local.get $ptr))
 
-          ;; this can point backwards
-          (i32.sub (local.get $tail_ptr) (local.get $ptr))
-          (local.set $tail_ptr )
-
           (i32.shl (local.get $tail_ptr) (i32.const 2))
-
           (i32.or (i32.const 1))
           (local.set $tail)
 
-          (i32.store ;; 0
-            (local.get $ptr)
-            (local.get $tail)
-          )
+          ;; 0
+          (i32.store (local.get $ptr) (local.get $tail))
           (local.set $ptr (i32.add (i32.const 4) (local.get $ptr)))
 
           (i32.store (local.get $ptr) (local.get $head)) ;; 1

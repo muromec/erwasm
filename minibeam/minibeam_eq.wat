@@ -50,14 +50,10 @@
         (then (nop))
         (else
           (i32.shr_u (local.get $head_a) (i32.const 2))
-          (i32.add (local.get $ptr_a))
-          (i32.and (i32.const 0x3F_FF_FF_FF))
           (local.set $ptr_a)
           (local.set $head_a (i32.load (local.get $ptr_a)))
 
           (i32.shr_u (local.get $head_b) (i32.const 2))
-          (i32.add (local.get $ptr_b))
-          (i32.and (i32.const 0x3F_FF_FF_FF))
           (local.set $ptr_b)
           (local.set $head_b (i32.load (local.get $ptr_b)))
           (br $elements)
