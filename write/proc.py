@@ -1,13 +1,15 @@
-from write.utils import push
+from write.utils import push, add_import
 
-# Not implemented yet
 class Send:
   def __init__(self, *args):
     pass
 
   def to_wat(self, ctx):
-    b = push(ctx, 'x', 1)
-    b += ';; send \n'
-    b += '(suspend $module_lib_fn_yield-i32)\n'
+    add_import(ctx, 'eractor', 'proc_send', 2)
+
+    b = ';; send \n'
+    b += push(ctx, 'x', 1)
+    b += push(ctx, 'x', 0)
+    b += '(call $eractor_proc_send_2)\n'
 
     return b
