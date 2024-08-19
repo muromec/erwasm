@@ -44,16 +44,104 @@ class Test3:
 
     return b + '(call $minibeam_test_eq_exact_2)\n'
 
+  def test_is_ne_exact(self, ctx):
+    b = self.load_args_to_stack(ctx)
+    add_import(ctx, 'minibeam', 'test_eq_exact', 2)
+
+    return b + '''
+        (call $minibeam_test_eq_exact_2)
+        (i32.eqz)
+    '''
+
+  def test_is_boolean(self, ctx):
+    [sarg] = self.test_args
+    return '(unreachable)\n'
+
+  def test_test_arity(self, ctx):
+    [sarg, tuple_arity] = self.test_args
+    add_import(ctx, 'erdump', 'hexlog', 1)
+
+    b = f'''
+      ;; test test_arity
+      ({ populate_stack_with(ctx, sarg) })
+      (local.set $temp)
+
+      (local.get $temp)
+      (i32.and (i32.const 3))
+      (if
+        (i32.eq (i32.const 2)) ;; mem ref
+        (then
+          (local.get $temp)
+          (i32.shr_u (i32.const 2))
+          (local.set $temp) ;; raw pointer to tuple head
+
+          (i32.load (local.get $temp))
+          (i32.and (i32.const 0x3f))
+          (if
+            (i32.eqz) ;; is tuple
+            (then
+              (i32.load (local.get $temp))
+              (i32.const 6)
+              (i32.shr_u)
+              (i32.eq (i32.const {tuple_arity}))
+              (local.set $temp)
+            )
+            (else ;; not a tuple
+              (local.set $temp (i32.const 0))
+            )
+          )
+        )
+        (else ;; not a mem ref
+          (local.set $temp (i32.const 0))
+        )
+      )
+      (local.get $temp)
+    '''
+
+    return b
+
+  def test_is_tuple(self, ctx):
+    [sarg] = self.test_args
+    add_import(ctx, 'erdump', 'hexlog', 1)
+
+    b = f'''
+      ;; test is_tuple
+      ({ populate_stack_with(ctx, sarg) })
+      (local.set $temp)
+
+
+      (local.get $temp)
+      (i32.and (i32.const 3))
+      (if
+        (i32.eq (i32.const 2)) ;; mem ref
+        (then
+          (local.get $temp)
+          (i32.shr_u (i32.const 2))
+          (local.set $temp) ;; raw pointer to tuple head
+
+          (i32.load (local.get $temp))
+          (i32.and (i32.const 0x3f))
+          (i32.eqz)
+          (local.set $temp)
+        )
+        (else ;; not a mem ref
+          (local.set $temp (i32.const 0))
+        )
+      )
+      (local.get $temp)
+    '''
+
+    return b
+
   def test_is_tagged_tuple(self, ctx):
     [sarg, tuple_arity, tag_atom] = self.test_args
     assert tag_atom[0] == 'atom'
     add_import(ctx, 'erdump', 'hexlog', 1)
 
     b = f'''
-      ; test is_tagged_tuple
-      { populate_stack_with(ctx, sarg) }
+      ;; test is_tagged_tuple
+      ({ populate_stack_with(ctx, sarg) })
       (local.set $temp)
-
 
       (local.get $temp)
       (i32.and (i32.const 3))
@@ -207,6 +295,12 @@ class Test5:
       (i32.eqz (local.get $temp))
       (i32.eqz)
     '''
+
+  def test_bs_get_utf8(self, ctx):
+    return '(unreachable)\n';
+
+  def test_bs_get_utf16(self, ctx):
+    return '(unreachable)\n';
 
   def test_bs_get_binary2(self, ctx):
     add_import(ctx, 'minibeam', 'get_binary_from_ctx', 2)

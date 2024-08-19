@@ -492,4 +492,28 @@
 
   (export "minibeam#bs_get_tail_0" (func $bs_get_tail))
 
+  (func $get_byte_size (param $mem i32) (result i32)
+    (local $ptr i32)
+    (local $size i32)
+
+    (if (i32.eq (i32.and (local.get $mem) (i32.const 2)) (i32.const 2))
+        (then nop)
+        (else unreachable)
+    )
+    (local.set $ptr (i32.shr_u (local.get $mem) (i32.const 2)))
+
+    (i32.load (local.get $ptr))
+    (i32.and (i32.const 0x3F))
+    (if (i32.eq (i32.const 0x24)) ;; has to be binary
+        (then nop)
+        (else unreachable)
+    )
+    (i32.load (i32.add (local.get $ptr) (i32.const 4)))
+    (local.set $size)
+
+    (i32.shr_u (local.get $size) (i32.const 3))
+  )
+  (export "minibeam#get_byte_size_1" (func $get_byte_size))
+
+
 )

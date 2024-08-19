@@ -71,6 +71,10 @@ class BsMatch:
       (i32.const 1)
      \n'''
 
+
+  def command_binary(self, ctx, *args):
+    return '(unreachable)\n'
+
   def command_skip(self, ctx, s):
     add_import(ctx, 'minibeam', 'bs_skip', 1)
 
@@ -159,9 +163,9 @@ class BsStartMatch:
     self.sreg = arg(sarg)
     self.dreg = arg(darg)
     self.max_regs = max_regs
-    [_a, [_resume]] = params
+    [_a, [_op]] = params
     assert _a == 'atom'
-    assert _resume == 'resume'
+    assert _op == 'resume' or _op == 'no_fail'
 
   def to_wat(self, ctx):
     b = f';; bs_start_match4 {self.sreg} -> {self.dreg}\n'

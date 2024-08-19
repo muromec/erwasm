@@ -17,8 +17,11 @@ def parse_list_sentence_helper(text, State, end_token, depth):
   # print('\t' * depth, 'down at', depth, State.idx)
   ret = []
   state = None
+  had_state = state
   acc = ''
+  acc_key = None
   while State.idx < len(text):
+    had_state = state or had_state
     symbol = text[State.idx]
     # print('helper', State.idx, symbol, state)
     State.idx += 1
@@ -57,6 +60,29 @@ def parse_list_sentence_helper(text, State, end_token, depth):
       state = None
     elif state == 'atom_quote':
       acc += symbol
+    elif state == None and symbol == '#':
+      state = 'dict'
+      acc = {}
+      acc_key = ''
+    elif state == 'dict'and symbol == '{':
+      pass
+    elif state == 'dict' and is_atom(symbol):
+      acc_key += symbol
+      state = 'dict_key'
+    elif state == 'dict_key' and is_atom(symbol):
+      acc_key += symbol
+    elif state == 'dict_key' and not is_atom(symbol):
+      state = 'dict'
+    elif state == 'dict' and symbol == '=':
+      pass
+    elif state == 'dict' and symbol == '>':
+      [ value ] = parse_list_sentence_helper(text, State, None, depth = depth + 1)
+      acc[acc_key] = value
+      acc_key = ''
+    elif state == 'dict' and symbol == '}':
+      ret.append(acc)
+      acc = None
+      state = None
     elif state == None and symbol == '"':
       state = 'str'
       acc = ''
@@ -72,11 +98,17 @@ def parse_list_sentence_helper(text, State, end_token, depth):
     if symbol == end_token:
       break
 
+    if end_token == state and ret:
+      break
+
   if acc and state == 'num':
     ret.append(int(acc))
 
   if acc and state == 'atom':
     ret.append(Atom(acc))
+
+  if acc and state == 'dict':
+    ret.append(acc)
 
   # print('\t' * depth, 'up at', State.idx)
   return ret
@@ -91,6 +123,8 @@ def parse_sentence_helper(text, State, depth):
   child_sentence = parse_list_sentence_helper(text, State, '}', depth = depth + 1)
   # print('c', '\t' * depth, child_sentence)
   # TODO: remove this
+  if not child_sentence:
+    return child_sentence
   if isinstance(child_sentence[0], Atom):
     child_sentence_old = (child_sentence[0], list(child_sentence[1:]))
     return child_sentence_old

@@ -1,8 +1,13 @@
 
 class Line:
   def __init__(self, info):
+    if len(info) == 2:
+      [scope, info] = info
+    elif info:
+      [info] = info
+
     if (info):
-      [_loc, [self.filename, self.linen]] = info[0]
+      [_loc, [self.filename, self.linen]] = info
       assert _loc == 'location'
 
     else:

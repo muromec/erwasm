@@ -17,7 +17,7 @@ class FuncInfo:
     pass
 
   def to_wat(self, ctx):
-    return 'unreachable ;; func info trap\n'
+    return '(unreachable) ;; func info trap\n'
 
 
 class BadMatch:
@@ -29,7 +29,7 @@ class BadMatch:
 
     return '''
       (call $erdump_hexlog_1 (i32.const 0xDEAD_0BAD))
-      unreachable ;; badmatch trap
+      (unreachable) ;; badmatch trap
     '''
 
 
