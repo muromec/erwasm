@@ -26,7 +26,7 @@
           (call $alloc (i32.const 4) (i32.const 16))
           (local.set $ptr)
           (local.set $ret (local.get $ptr))
-          (local.set $tail_ptr (i32.add (local.get $tail_ptr) (i32.const 8)))
+          (local.set $tail_ptr (i32.add (local.get $ptr) (i32.const 8)))
 
           (i32.shl (local.get $tail_ptr) (i32.const 2))
           (i32.or (i32.const 1))

@@ -120,7 +120,7 @@ class GetTail:
     pop_tail = pop(ctx, *self.darg_t)
 
     return f'''
-      ;; get_list
+      ;; get_tail
       (block $get_tail
       { push_src }
       (i32.and (i32.const 3))
