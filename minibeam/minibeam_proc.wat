@@ -8,7 +8,7 @@
 
   (type $func (func))
   (type $cont (cont $func))
-  (export "eractor#cont" (type $cont))
+  ;; (export "eractor#cont" (type $cont))
 
   (tag $self (result i32))
   (tag $spawn (param (ref $cont)) (result i32))
