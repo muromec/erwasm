@@ -20,6 +20,7 @@ def parse_list_sentence_helper(text, State, end_token, depth):
   had_state = state
   acc = ''
   acc_key = None
+  acc_bytes_str = None
   while State.idx < len(text):
     had_state = state or had_state
     symbol = text[State.idx]
@@ -34,6 +35,30 @@ def parse_list_sentence_helper(text, State, end_token, depth):
       child_sentence = parse_list_sentence_helper(text, State, ']', depth = depth + 1)
       # print('c', child_sentence)
       ret.append(child_sentence)
+    elif state == None and symbol == '<':
+      state = 'open_bytes'
+    elif state == 'open_bytes' and symbol == '<':
+      state = 'bytes'
+      acc = b''
+    elif state == 'bytes' and symbol == '"':
+      state = 'bytes_str'
+      acc_bytes_str = b''
+    elif state == 'bytes_str' and symbol == '"':
+      state = 'bytes'
+      acc += acc_bytes_str
+      acc_bytes_str = None
+    elif state == 'bytes' and symbol == '>':
+      state = 'close_bytes'
+      # print('got bytes', acc)
+      ret.append(acc)
+      acc = None
+    elif state == 'close_bytes' and symbol == '>':
+      state = None
+    elif state == 'bytes':
+      assert False
+      acc += symbol
+    elif state == 'bytes_str':
+      acc_bytes_str += bytes(symbol, 'utf8')
     elif state == None and is_num(symbol):
       state = 'num'
       acc = symbol

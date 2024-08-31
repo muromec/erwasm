@@ -64,7 +64,7 @@ def pack_reg_value(ctx, value):
   if isinstance(value, int):
     return (value << 4 | 0xF)
  
-  if isinstance(value, (list, tuple)):
+  if isinstance(value, (list, tuple, bytes)):
     (offset, _name) = add_literal(ctx, value)
     return (offset << 2 | 2)
 
@@ -109,6 +109,12 @@ def pack_literal(ctx, value):
     for s_value in value:
       ret += make_word(pack_reg_value(ctx, s_value))
 
+    return ret
+
+  if isinstance(value, bytes):
+    ret = make_word(0x24)
+    ret += make_word(len(value) << 3)
+    ret += list(value)
     return ret
 
   assert False, f'cant pack as constant value {value}'
