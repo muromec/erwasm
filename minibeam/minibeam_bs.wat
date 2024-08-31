@@ -3,6 +3,7 @@
   (import "erdump" "alloc" (func $alloc (param i32 i32) (result i32)))
   (import "erdump" "hexlog_1" (func $hexlog (param i32) (result i32)))
   (import "erdump" "write_buf" (func $make_erl_buf (param i32 i32) (result i32)))
+  (memory 0)
 
   ;; inlie the two below
   (func $i16_flip (param $value i32) (result i32)
@@ -289,7 +290,7 @@
     (local.set $offset (i32.add (local.get $offset) (local.get $bits_number)))
     (i32.store (i32.add (local.get $ptr) (i32.const 8)) (local.get $offset))
 
-    (i32.const 1);
+    (i32.const 1)
   )
   (export "minibeam#bs_skip_1" (func $bs_skip))
 
@@ -419,7 +420,7 @@
     (local.get $ret)
   )
 
-  (export "minibeam#get_binary_from_ctx_1" (func $bs_get_binary))
+  (export "minibeam#get_binary_from_ctx_2" (func $bs_get_binary))
 
   (func $bs_get_tail (param $ctx i32) (result i32)
     (local $ptr i32)

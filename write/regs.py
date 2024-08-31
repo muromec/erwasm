@@ -11,8 +11,8 @@ class Allocate:
     self.xreg = int(xreg)
 
   def to_wat(self, ctx):
-    ctx.max_yregs = max(ctx.max_yregs, self.yreg)
-    ctx.max_xregs = max(ctx.max_xregs, self.xreg)
+    ctx.max_yregs = max(ctx.max_yregs, self.yreg + 1)
+    ctx.max_xregs = max(ctx.max_xregs, self.xreg + 1)
 
     return ''
 
@@ -44,11 +44,11 @@ class Swap:
 
   def to_wat(self, ctx):
     return f'''
-    ({ push(ctx, *self.sreg) })
+    { push(ctx, *self.sreg) }
     (local.set $temp)
-    ({ push(ctx, *self.dreg) })
-    ({ pop(ctx, *self.sreg) })
+    { push(ctx, *self.dreg) }
+    { pop(ctx, *self.sreg) }
 
     (local.get $temp)
-    ({ pop(ctx, *self.dreg) })
+    { pop(ctx, *self.dreg) }
     '''

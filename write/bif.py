@@ -41,7 +41,41 @@ class Bif:
         (i32.shl)
         (i32.or (i32.const 0xF))
       '''
-
+    elif self.op == "length":
+      add_import(ctx, 'erlang', 'length', 1)
+      b += f'''(call $erlang_length_1)\n'''
+    elif self.op == "div":
+      b += '''
+      (i32.shr_u (i32.xor (i32.const 0xF)) (i32.const 4))
+      (local.set $temp)
+      (i32.shr_u (i32.xor (i32.const 0xF)) (i32.const 4))
+      (i32.div_u (local.get $temp))
+      (i32.shl (local.get $temp) (i32.const 4))
+      (i32.or (i32.const 0xF))
+      '''
+    elif self.op == "rem":
+      b += '''
+      (i32.shr_u (i32.xor (i32.const 0xF)) (i32.const 4))
+      (local.set $temp)
+      (i32.shr_u (i32.xor (i32.const 0xF)) (i32.const 4))
+      (i32.rem_u (local.get $temp))
+      (i32.shl (local.get $temp) (i32.const 4))
+      (i32.or (i32.const 0xF))
+      '''
+    elif self.op == "bsr":
+      b += '''
+        (i32.const 4)
+        (i32.shr_u)
+        (i32.shr_u)
+        (i32.const 0xF)
+        (i32.or)
+      '''
+    elif self.op == "band":
+      b += '''
+        (i32.and)
+        (i32.const 0xF)
+        (i32.or)
+      '''
     else:
       assert False, f'unknown bif {self.op}'
 

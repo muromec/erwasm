@@ -63,7 +63,7 @@ class Test3:
 
     b = f'''
       ;; test test_arity
-      ({ populate_stack_with(ctx, sarg) })
+      { populate_stack_with(ctx, sarg) }
       (local.set $temp)
 
       (local.get $temp)
@@ -106,7 +106,7 @@ class Test3:
 
     b = f'''
       ;; test is_tuple
-      ({ populate_stack_with(ctx, sarg) })
+      { populate_stack_with(ctx, sarg) }
       (local.set $temp)
 
 
@@ -140,7 +140,7 @@ class Test3:
 
     b = f'''
       ;; test is_tagged_tuple
-      ({ populate_stack_with(ctx, sarg) })
+      { populate_stack_with(ctx, sarg) }
       (local.set $temp)
 
       (local.get $temp)
@@ -200,9 +200,45 @@ class Test3:
       'is_le': 'i32.le_u\n',
       'is_gt': 'i32.gt_u\n',
       'is_ge': 'i32.ge_u\n',
+      'is_function2': '(drop) (drop) (i32.const 0)\n', # its never a function
       'is_atom': '''
         (i32.and (i32.const 0x3F))
         (i32.eq (i32.const 0xB))
+      ''',
+      'is_integer': '''
+        (i32.and (i32.const 0xF))
+        (i32.eq (i32.const 0xF))
+      ''',
+      'is_float': ''' ;; is float is aliased to is integer because reasons
+        (i32.and (i32.const 0xF))
+        (i32.eq (i32.const 0xF))
+      ''',
+      'is_number': '''
+        (i32.and (i32.const 0xF))
+        (i32.eq (i32.const 0xF))
+      ''',
+      'is_binary': '''
+        (local.set $temp)
+
+        (local.get $temp)
+        (i32.and (i32.const 3))
+        (if
+          (i32.eq (i32.const 2)) ;; mem ref
+          (then
+            (local.get $temp)
+            (i32.shr_u (i32.const 2))
+            (i32.load)
+            (i32.and (i32.const 0x3F))
+            (i32.eq (i32.const 0x24)) ;; should be heap binary
+            (local.set $temp)
+          )
+          (else
+            (i32.const 0)
+            (local.set $temp)
+          )
+        )
+        (local.get $temp)
+
       ''',
       'is_nil': '''
         (local.set $temp)
@@ -251,7 +287,40 @@ class Test3:
         (local.get $temp)
         (i32.or (i32.const 0xFF_00))
         (local.get $temp)
+      ''',
+      'is_list': f'''
+        ;; test the list
+        (local.set $temp)
+
+        (local.get $temp)
+        (i32.and (i32.const 3))
+        (if
+          (i32.eq (i32.const 2)) ;; mem ref
+          (then
+            (local.get $temp)
+            (i32.shr_u (i32.const 2))
+            (i32.load)
+            (local.set $temp)
+
+            (i32.and (i32.const 3) (local.get $temp))
+            (if (i32.eq (i32.const 1)) ;; list next item ref
+              (then (local.set $temp (i32.const 1)))
+              (else
+                (i32.eq (local.get $temp) (i32.const 0x3b))
+                (local.set $temp)
+              )
+            )
+          )
+          (else
+            (i32.const 0)
+            (local.set $temp)
+          )
+        )
+        (local.get $temp)
+        (i32.or (i32.const 0xFF_00))
+        (local.get $temp)
       '''
+
     }[self.test_op])
 
 
@@ -283,7 +352,7 @@ class Test5:
 
     add_import(ctx, 'minibeam', 'make_match_context', 1)
     return f'''
-      ({ push(ctx, *sreg) })
+      { push(ctx, *sreg) }
       (i32.const 0) ;; do we really need to pass offset?
       (call $minibeam_make_match_context_1)
       (local.set $temp)
@@ -320,8 +389,8 @@ class Test5:
     sreg2 = arg(size_reg)
 
     return f'''
-      ({ push(ctx, *sreg1) })
-      ({ push(ctx, *sreg2) })
+      { push(ctx, *sreg1) }
+      { push(ctx, *sreg2) }
       (call $minibeam_get_binary_from_ctx_2)
       (local.set $temp)
       (if (i32.eqz (local.get $temp))

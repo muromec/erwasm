@@ -1,5 +1,6 @@
 (module
   (import "erdump" "hexlog_1" (func $hexlog (param i32) (result i32)))
+  (memory 0)
 
   (func $test_eq_helper (param $ptr_a i32) (param $ptr_b i32) (result i32)
     (local $element_a i32)

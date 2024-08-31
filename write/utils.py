@@ -42,14 +42,14 @@ def ignore_call(ext_mod, ext_fn):
 
 
 def pop(ctx, typ, num):
-  assert typ in ['x', 'y']
-
   if typ == 'x':
     ctx.max_xregs = max(ctx.max_xregs, num + 1)
-  if typ == 'y':
-    ctx.max_yregs = max(ctx.max_yregs, num, + 1)
+  elif typ == 'y':
+    ctx.max_yregs = max(ctx.max_yregs, num + 1)
+  else:
+    assert False
 
-  return f'local.set $var_{typ}reg_{num}_val\n'
+  return f'(local.set $var_{typ}reg_{num}_val)\n'
 
 def push(ctx, typ, num):
   assert typ in ['x', 'y']
@@ -59,10 +59,11 @@ def push(ctx, typ, num):
   if typ == 'y':
     ctx.max_yregs = max(ctx.max_yregs, num, + 1)
 
-  return f'local.get $var_{typ}reg_{num}_val\n'
+  return f'(local.get $var_{typ}reg_{num}_val)\n'
 
 def move(ctx, styp, snum, dtyp, dnum):
-  b = push(ctx, styp, snum)
+  b = ';; move\n'
+  b += push(ctx, styp, snum)
   b += pop(ctx, dtyp, dnum)
   return b
 
@@ -106,7 +107,7 @@ def populate_stack_with(ctx, value):
 
 def populate_with(ctx, dtyp, dnum, value):
   b = populate_stack_with(ctx, value)
-  b += f'(local.set $var_{dtyp}reg_{dnum}_val)\n'
+  b += pop(ctx, dtyp, dnum)
   return b
 
 def arg(value):

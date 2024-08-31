@@ -174,5 +174,5 @@ class PutList:
 
     return b + f'''
       (call $minibeam_list_put_2)
-      ({ pop(ctx, *self.dreg) })
+      { pop(ctx, *self.dreg) }
     '''

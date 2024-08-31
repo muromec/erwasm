@@ -92,7 +92,7 @@ class SelectTupleArity:
   def to_wat(self, ctx):
     b = f'''
       ;; select_tuple_arity
-      ({ push(ctx, *self.sarg) })
+      { push(ctx, *self.sarg) }
       (local.set $temp)
 
       (local.get $temp)

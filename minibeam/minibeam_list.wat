@@ -2,6 +2,7 @@
 
   (import "erdump" "alloc" (func $alloc (param i32 i32) (result i32)))
   (import "erdump" "hexlog_1" (func $hexlog (param i32) (result i32)))
+  (memory 0)
 
   (func $put_list (param $head i32) (param $tail i32) (result i32)
     (local $ret i32)
@@ -152,5 +153,61 @@
     (i32.xor (i32.const 3))
   )
   (export  "lists#reverse_1" (func $reverse_1))
+
+  (func $length_1 (param $arg i32) (result i32)
+    (local $ret i32)
+    (local $ptr i32)
+    (local $in_ptr i32)
+    (local $temp i32)
+    (local $tail i32)
+    (local $len i32)
+
+    (i32.eq (local.get $arg) (i32.const 0x3b))
+    (if
+      (then
+        (return (i32.const 0x3b))
+      )
+    )
+
+    ;; check its a mem pointer
+    (if (i32.eq (i32.and (local.get $arg) (i32.const 3)) (i32.const 2))
+      (then
+        (local.get $arg)
+        (i32.shr_u (i32.const 2))
+        (local.set $in_ptr)
+      )
+      (else
+        (unreachable)
+      )
+    )
+
+    ;; empty list is len 0
+    (if (i32.eq (i32.load (local.get $in_ptr)) (i32.const 0x3b))
+      (then
+        (return (i32.const 0x0F))
+      )
+    )
+    (local.set $len (i32.const 0))
+
+    (block $out
+    (loop $iter
+      (i32.load (local.get $in_ptr))
+      (if (i32.eq (i32.const 0x3b))
+          (then (br $out))
+      )
+      (local.set $len (i32.add (local.get $len) (i32.const 1)))
+
+      ;; load tail pointer of input list
+      (i32.load (local.get $in_ptr))
+      (i32.shr_u (i32.const 2))
+      (local.set $in_ptr)
+      (br $iter)
+    )
+    )
+
+    (i32.shl (local.get $len) (i32.const 4))
+    (i32.or (i32.const 0xF))
+  )
+  (export  "erlang#length_1" (func $length_1))
 
 )

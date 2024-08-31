@@ -38,7 +38,7 @@ class BsMatch:
 
     return f'''(call 
         $minibeam_bs_ensure_at_least_2
-        ({ push(ctx, *self.sreg) })
+        { push(ctx, *self.sreg) }
         (i32.const {s})
         (i32.const {n})
      )\n'''
@@ -48,7 +48,7 @@ class BsMatch:
 
     return f'''(call
         $minibeam_bs_ensure_exactly_1
-        ({ push(ctx, *self.sreg) })
+        { push(ctx, *self.sreg) }
         (i32.const {n})
      )\n'''
 
@@ -61,13 +61,13 @@ class BsMatch:
       (i32.shl
         (call
           $minibeam_bs_load_integer_1
-          ({ push(ctx, *self.sreg) })
+          { push(ctx, *self.sreg) }
           (i32.const {s})
         )
         (i32.const 4)
       )
       (i32.or (i32.const 0xF))
-      ( { pop(ctx, *dreg) } )
+      { pop(ctx, *dreg) }
       (i32.const 1)
      \n'''
 
@@ -80,7 +80,7 @@ class BsMatch:
 
     return f'''(call
         $minibeam_bs_skip_1
-        ({ push(ctx, *self.sreg) })
+        { push(ctx, *self.sreg) }
         (i32.const {s})
      )\n'''
 
@@ -91,7 +91,7 @@ class BsMatch:
       ;; get integer from bs match
       (call 
         $minibeam_bs_load_integer_1
-        ({ push(ctx, *self.sreg) })
+        { push(ctx, *self.sreg) }
         (i32.const {s})
       )
       (i32.const {value})
@@ -112,12 +112,12 @@ class BsGetPosition:
       (i32.shl
         (call
           $minibeam_bs_get_position_0
-          ({ push(ctx, *self.sreg) })
+          { push(ctx, *self.sreg) }
         )
         (i32.const 4)
       )
       (i32.or (i32.const 0xF))
-      ( { pop(ctx, *self.dreg) } )
+      { pop(ctx, *self.dreg) }
      \n'''
 
 
@@ -133,8 +133,8 @@ class BsSetPosition:
       ;; pass integer to set position
       (call
         $minibeam_bs_set_position_1
-        ({ push(ctx, *self.sreg) })
-        (i32.shr_u ( { push(ctx, *self.dreg) } ) (i32.const 4))
+        { push(ctx, *self.sreg) }
+        (i32.shr_u { push(ctx, *self.dreg) } (i32.const 4))
       )
      \n'''
 
@@ -152,9 +152,9 @@ class BsGetTail:
       ;; get tail bytes from context
       (call
         $minibeam_bs_get_tail_0
-        ({ push(ctx, *self.sreg) })
+        { push(ctx, *self.sreg) }
       )
-      ( { pop(ctx, *self.dreg) } )
+      { pop(ctx, *self.dreg) }
      \n'''
 
 class BsStartMatch:

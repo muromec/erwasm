@@ -53,6 +53,12 @@ MEM_NEXT_FREE = '''
   (global $__free_mem i32 (i32.const {offset}))
 '''
 
+def sanitize_func(name):
+  if name.startswith('-object'):
+    name = name.replace('-', '__beam_min__').replace('/', '__beam_slash__')
+
+  return name
+
 def produce_wasm(module):
   body = ''
 
@@ -192,7 +198,7 @@ def produce_wasm(module):
     localvars += f'(local $jump i32)\n'
 
     body += FUNC.format(
-      name=func.name,
+      name=sanitize_func(func.name),
       arity=func.arity,
       start_label=func.start_label,
       params=make_in_params_n(int(func.arity)),

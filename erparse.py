@@ -108,6 +108,7 @@ def parse_list_sentence_helper(text, State, end_token, depth):
       ret.append(acc)
       acc = None
       state = None
+      continue
     elif state == None and symbol == '"':
       state = 'str'
       acc = ''
@@ -145,7 +146,7 @@ def clean_v(value):
   return value
 
 def parse_sentence_helper(text, State, depth):
-  child_sentence = parse_list_sentence_helper(text, State, '}', depth = depth + 1)
+  child_sentence = parse_list_sentence_helper(text, State, '}', depth = depth)
   # print('c', '\t' * depth, child_sentence)
   # TODO: remove this
   if not child_sentence:
