@@ -104,6 +104,55 @@
     (i32.const 1)
   )
 
+  (func $test_eq_exact_buffer (param $ptr_a i32) (param $ptr_b i32) (result i32)
+    (local $size_a i32)
+    (local $size_b i32)
+
+    (i32.add (i32.const 4) (local.get $ptr_a))
+    (i32.load)
+    (local.set $size_a) ;; in bits
+
+    (i32.add (i32.const 4) (local.get $ptr_b))
+    (i32.load)
+    (local.set $size_b) ;; in bits
+
+
+    (if (i32.eq (local.get $size_a) (local.get $size_b))
+        (then)
+        (else
+          (return (i32.const 0))
+        )
+    )
+    (i32.shr_u (local.get $size_a) (i32.const 3))
+    (local.set $size_a) ;; in bytes
+
+    (local.set $ptr_a (i32.add (local.get $ptr_a) (i32.const 8)))
+    (local.set $ptr_b (i32.add (local.get $ptr_b) (i32.const 8)))
+
+    (loop $elements
+      (if (i32.eqz (local.get $size_a))
+          (then (return (i32.const 1)))
+      )
+
+      (i32.load8_u (local.get $ptr_a))
+      (i32.load8_u (local.get $ptr_b))
+
+      (if (i32.eq)
+        (then (nop))
+        (else
+          (return (i32.const 0))
+        )
+      )
+
+      (local.set $ptr_a (i32.add (local.get $ptr_a) (i32.const 1)))
+      (local.set $ptr_b (i32.add (local.get $ptr_b) (i32.const 1)))
+      (local.set $size_a (i32.sub (local.get $size_a) (i32.const 1)))
+      (br $elements)
+    )
+
+    (i32.const 1)
+  )
+
   (func $test_eq_exact (param $value_a i32) (param $value_b i32) (result i32)
     (local $tag_a i32)
     (local $tag_b i32)
@@ -157,6 +206,20 @@
       )
     )
 
+    (if (i32.eq (local.get $tag_a) (local.get $tag_b))
+      (then
+        (if (i32.eq (local.get $tag_a) (i32.const 0x24))
+          (then
+            (return
+              (call $test_eq_exact_buffer
+                (i32.shr_u (local.get $value_a) (i32.const 2))
+                (i32.shr_u (local.get $value_b) (i32.const 2))
+              )
+            )
+          )
+        )
+      )
+    )
 
     (local.set $tag_a (i32.and (i32.const 0x3) (local.get $head_a)))
     (local.set $tag_b (i32.and (i32.const 0x3) (local.get $head_b)))

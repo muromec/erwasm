@@ -14,12 +14,11 @@
   )
 
   (export      "maps#from_list_1" (func $nop_1))
-  (export      "lists#reverse_1" (func $nop_1))
   (export      "erlang#binary_to_integer_2" (func $nop_2))
   (export      "erlang#binary_to_atom_2" (func $nop_2))
   (export      "erlang#binary_to_existing_atom_2" (func $nop_2))
+  (export      "erlang#error_1" (func $nop_1))
   (export      "erlang#error_2" (func $nop_2))
 
-  (export      "binary#part_3" (func $nop_3))
 
 )

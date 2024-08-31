@@ -492,9 +492,36 @@
 
   (export "minibeam#bs_get_tail_0" (func $bs_get_tail))
 
+  (func $byte_size_bin (param $ptr i32) (result i32)
+    (local $size i32)
+    (i32.load (i32.add (local.get $ptr) (i32.const 4)))
+    (local.set $size)
+
+    (i32.shr_u (local.get $size) (i32.const 3)) ;; was in bits
+  )
+
+  (func $byte_size_ctx (param $ptr i32) (result i32)
+    (local $full_size i32)
+    (local $bin_ptr i32)
+    (local $offset i32)
+
+    (i32.load (i32.add (local.get $ptr) (i32.const 4)))
+    (local.set $bin_ptr)
+    (call $get_byte_size (local.get $bin_ptr))
+    (local.set $full_size) ;; in bytes
+
+    ;; offset is in bits
+    (i32.load (i32.add (local.get $ptr) (i32.const 8)))
+    (local.set $offset)
+    (i32.shr_u (local.get $offset) (i32.const 3)) ;; was in bits
+    (local.set $offset)
+
+    (i32.sub (local.get $full_size) (local.get $offset))
+  )
+
+
   (func $get_byte_size (param $mem i32) (result i32)
     (local $ptr i32)
-    (local $size i32)
 
     (if (i32.eq (i32.and (local.get $mem) (i32.const 2)) (i32.const 2))
         (then nop)
@@ -505,15 +532,57 @@
     (i32.load (local.get $ptr))
     (i32.and (i32.const 0x3F))
     (if (i32.eq (i32.const 0x24)) ;; has to be binary
-        (then nop)
-        (else unreachable)
+        (then
+          (return (call $byte_size_bin (local.get $ptr)))
+        )
     )
-    (i32.load (i32.add (local.get $ptr) (i32.const 4)))
-    (local.set $size)
 
-    (i32.shr_u (local.get $size) (i32.const 3))
+    (i32.load (local.get $ptr))
+    (i32.and (i32.const 0x3F))
+    (if (i32.eq (i32.const 0x4)) ;; has to be match ctx
+        (then
+          (return (call $byte_size_ctx (local.get $ptr)))
+        )
+    )
+
+    (unreachable)
   )
   (export "minibeam#get_byte_size_1" (func $get_byte_size))
 
+  (func $binary_part_3 (param $mem i32) (param $pos i32) (param $len i32) (result i32)
+    (local $ptr i32)
 
+    (if (i32.eq (i32.and (local.get $pos) (i32.const 0xF)) (i32.const 0xF))
+        (then nop)
+        (else unreachable)
+    )
+    (local.set $pos (i32.shr_u (local.get $pos) (i32.const 4)))
+
+    (if (i32.eq (i32.and (local.get $len) (i32.const 0xF)) (i32.const 0xF))
+        (then nop)
+        (else unreachable)
+    )
+    (local.set $len (i32.shr_u (local.get $len) (i32.const 4)))
+
+    (if (i32.eq (i32.and (local.get $mem) (i32.const 2)) (i32.const 2))
+        (then nop)
+        (else unreachable)
+    )
+    (local.set $ptr (i32.shr_u (local.get $mem) (i32.const 2)))
+
+    (i32.load (local.get $ptr))
+    (i32.and (i32.const 0x3F))
+    (if (i32.eq (i32.const 0x24)) ;; has to be binary
+        (then (nop))
+        (else (unreachable))
+    )
+    (i32.add (local.get $ptr) (i32.const 8))
+    (local.set $ptr)
+    (i32.add (local.get $ptr) (local.get $pos))
+    (local.set $ptr)
+
+    (call $make_erl_buf (local.get $ptr) (local.get $len))
+  )
+
+  (export "binary#part_3" (func $binary_part_3))
 )
