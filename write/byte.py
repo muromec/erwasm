@@ -1,4 +1,4 @@
-from write.utils import push, pop, add_import, arg, populate_with
+from write.utils import push, pop, add_import, arg, populate_with, populate_stack_with
 
 class BsMatch:
   def __init__(self, fail_dest, sarg, command_table):
@@ -189,3 +189,67 @@ class BsStartMatch:
       return b
 
     assert False, 'unknown flag for bs_start_match4'
+
+class BsCreateBin:
+  def __init__(self, fdest, alloc, live, unit, darg, ops):
+    self.dreg = arg(darg)
+    [_list, [ops]] = ops
+    assert _list == 'list'
+    self.ops = ops
+
+  def to_wat(self, ctx):
+    add_import(ctx, 'minibeam', 'get_byte_size', 1)
+    add_import(ctx, 'minibeam', 'alloc_binary', 1)
+    add_import(ctx, 'minibeam', 'into_buf', 3)
+
+    next_value = False
+    to_read = []
+    for op in self.ops:
+      if op == 'nil':
+        next_value = True
+        continue
+
+      if not next_value:
+        continue
+
+      if op[0] == 'tr':
+        op = op[1][0]
+
+      if op[0] == 'string' and not op[1]:
+        continue
+
+      to_read.append(populate_stack_with(ctx, op))
+
+      next_value = False
+    b = ';; bs_create_bin\n'
+    b += '(local.set $temp (i32.const 0))\n'
+
+    for segment in to_read:
+      b += f'''
+        { segment }
+        (call $minibeam_get_byte_size_1)
+        (i32.add (local.get $temp))
+        (local.set $temp)
+      '''
+
+    b += '''
+      (call $minibeam_alloc_binary_1 (i32.const 16) (local.get $temp))
+      (local.set $temp)
+    '''
+
+    b += '(i32.const 0) ;; initial offset 0\n'
+    for segment in to_read:
+      b += f'''
+        (local.get $temp)
+        { segment }
+        (call $minibeam_into_buf_3)
+      '''
+
+    b += f'''
+      (drop)
+      (i32.or (i32.shl (local.get $temp) (i32.const 2)) (i32.const 2))
+      { pop(ctx, *self.dreg) }
+
+    '''
+
+    return b

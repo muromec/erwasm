@@ -95,7 +95,7 @@ def populate_stack_with(ctx, value):
       )
       (i32.or (i32.const 0xB))
     '''
-  elif typ == 'literal':
+  elif typ == 'literal' or typ == 'string':
     (_offset, literal_name) = add_literal(ctx, val)
     b += f'(global.get ${literal_name})\n'
   elif typ == 'x' or typ == 'y':
@@ -112,7 +112,8 @@ def populate_with(ctx, dtyp, dnum, value):
 
 def arg(value):
   [typ, [num]] = value
-  assert typ in ('x', 'y')
+  typ = str(typ)
+  assert typ in ('x', 'y'), f'Wrong type {typ}'
   return typ, int(num)
 
 

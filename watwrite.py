@@ -4,7 +4,7 @@ from write.line import Line
 from write.jump import Jump
 from write.move import Move
 from write.test import Test
-from write.byte import BsStartMatch, BsMatch, BsGetPosition, BsSetPosition, BsGetTail
+from write.byte import BsStartMatch, BsMatch, BsGetPosition, BsSetPosition, BsGetTail, BsCreateBin
 from write.ret import Ret
 from write.select_val import SelectVal
 from write.list import GetList, GetHead, GetTail, PutList
@@ -146,6 +146,7 @@ def produce_wasm(module):
         'bs_get_position': BsGetPosition,
         'bs_set_position': BsSetPosition,
         'bs_get_tail': BsGetTail,
+        'bs_create_bin': BsCreateBin,
         'return': Ret,
         'select_val': SelectVal,
         'badmatch': BadMatch,
