@@ -8,7 +8,7 @@ from write.byte import BsStartMatch, BsMatch, BsGetPosition, BsSetPosition, BsGe
 from write.ret import Ret
 from write.select_val import SelectVal
 from write.list import GetList, GetHead, GetTail, PutList
-from write.tuple import PutTuple2, GetTupleElement
+from write.tuple import PutTuple2, GetTupleElement, SelectTupleArity
 from write.call import (
   LocalCall, LocalCallDrop, LocalCallTail,
   ExternalCall, ExternalCallDrop, ExternalCallTail,
@@ -147,6 +147,7 @@ def produce_wasm(module):
         'put_list': PutList,
         'put_tuple2': PutTuple2,
         'get_tuple_element': GetTupleElement,
+        'select_tuple_arity': SelectTupleArity,
 
         'allocate': Allocate,
         'trim': Trim,

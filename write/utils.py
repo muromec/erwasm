@@ -87,7 +87,13 @@ def populate_stack_with(ctx, value):
   elif typ == 'atom':
     # print('v', val)
     (atom_name, _atom_id) = ctx.register_atom(str(val))
-    b += f'(global.get $__unique_atom__{str(atom_name)}) ;; atom {val}\n'
+    b += f'''
+      (i32.shl
+        (global.get $__unique_atom__{str(atom_name)}) ;; atom {val}\n
+        (i32.const 6)
+      )
+      (i32.or (i32.const 0xB))
+    '''
   elif typ == 'literal':
     (_offset, literal_name) = add_literal(ctx, val)
     b += f'(global.get ${literal_name})\n'

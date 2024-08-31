@@ -78,3 +78,79 @@ class GetTupleElement:
     '''
     return b
 
+
+class SelectTupleArity:
+  def __init__(self, sarg, fail, table):
+    [_tr, [sarg, _info]] = sarg
+    assert _tr == 'tr'
+    self.sarg = arg(sarg)
+    self.fail = fail
+    [_list, [table]] = table
+    assert _list == 'list'
+    self.table = table
+
+  def to_wat(self, ctx):
+    b = f'''
+      ;; select_tuple_arity
+      ({ push(ctx, *self.sarg) })
+      (local.set $temp)
+
+      (local.get $temp)
+      (i32.and (i32.const 3))
+      (if
+        (i32.eq (i32.const 2)) ;; mem ref
+        (then
+          (local.get $temp)
+          (i32.shr_u (i32.const 2))
+          (local.set $temp) ;; raw pointer to tuple head
+
+          (i32.load (local.get $temp))
+          (i32.and (i32.const 0x3f))
+          (if
+            (i32.eqz) ;; is tuple
+            (then
+              (i32.load (local.get $temp))
+              (i32.const 6)
+              (i32.shr_u)
+              (local.set $temp)
+            )
+            (else ;; not a tuple
+              (unreachable)
+            )
+          )
+        )
+        (else ;; not a mem ref
+          (local.set $temp (i32.const 0))
+        )
+      )
+    '''
+
+    table = self.table[:]
+    while table:
+      arity = table.pop(0)
+      [_f, [jump]] = table.pop(0)
+      assert _f == 'f'
+      jump = int(jump)
+      jump_depth = ctx.labels_to_idx.index(jump)
+      assert not (jump_depth is None)
+
+      b += f'''
+        ;; for arity {arity} jump to label {jump}
+        (local.set $jump (i32.const {jump_depth}))
+        (i32.eq (i32.const {arity}) (local.get $temp))
+        (br_if $start)
+      '''
+
+    [_f, [jump]] = self.fail
+    jump = int(jump)
+    jump_depth = ctx.labels_to_idx.index(jump)
+
+    b += f'''
+      ;; fallthrough to {jump_depth}
+      (local.set $jump (i32.const {jump_depth}))
+      (br $start)
+    ;; end of select_tuple_arity
+    '''
+
+
+    return b

@@ -239,8 +239,8 @@ class Test3:
             (local.get $temp)
             (i32.shr_u (i32.const 2))
             (i32.load)
-            (i32.eq (i32.const 0x3b))
-            (i32.eqz)
+            (i32.and (i32.const 3))
+            (i32.eq (i32.const 1)) ;; list next item ref
             (local.set $temp)
           )
           (else
@@ -248,6 +248,8 @@ class Test3:
             (local.set $temp)
           )
         )
+        (local.get $temp)
+        (i32.or (i32.const 0xFF_00))
         (local.get $temp)
       '''
     }[self.test_op])

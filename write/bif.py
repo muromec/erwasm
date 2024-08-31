@@ -35,7 +35,12 @@ class Bif:
       '''
     elif self.op == "byte_size":
       add_import(ctx, 'minibeam', 'get_byte_size', 1)
-      b += f'(call $minibeam_get_byte_size_1)\n'
+      b += f'''
+        (call $minibeam_get_byte_size_1)
+        (i32.const 4)
+        (i32.shl)
+        (i32.or (i32.const 0xF))
+      '''
 
     else:
       assert False, f'unknown bif {self.op}'

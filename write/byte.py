@@ -159,20 +159,33 @@ class BsGetTail:
 
 class BsStartMatch:
   def __init__(self, params, max_regs, sarg, darg):
+    [_a, [op]] = params
+
     self.sarg = sarg
     self.sreg = arg(sarg)
     self.dreg = arg(darg)
     self.max_regs = max_regs
-    [_a, [_op]] = params
+    self.op = op
     assert _a == 'atom'
-    assert _op == 'resume' or _op == 'no_fail'
+    assert op == 'resume' or op == 'no_fail'
 
   def to_wat(self, ctx):
-    b = f';; bs_start_match4 {self.sreg} -> {self.dreg}\n'
+    b = f';; bs_start_match4 {self.sreg} -> {self.dreg} ({self.op})\n'
     # if source and dest are the same, do nothing
     # normally ref count should be here
-    if self.sreg == self.dreg:
-      b += ';; nop\n'
+    if self.op == 'resume':
+      if self.sreg == self.dreg:
+        b += ';; nop\n'
+        return b
+
+      return b + populate_with(ctx, *self.dreg, self.sarg)
+    if self.op == 'no_fail':
+      add_import(ctx, 'minibeam', 'make_match_context', 1)
+
+      b += push(ctx, *self.sreg)
+      b += '(i32.const 0)\n'
+      b += '(call $minibeam_make_match_context_1)\n'
+      b += pop(ctx, *self.dreg)
       return b
 
-    return b + populate_with(ctx, *self.dreg, self.sarg)
+    assert False, 'unknown flag for bs_start_match4'
