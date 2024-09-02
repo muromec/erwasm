@@ -14,12 +14,16 @@
   (func $make_match_context (param $mem i32) (param $offset i32) (result i32)
     (local $ptr i32)
     (local $ret i32)
+    (local $value i32)
 
     (if (i32.eq (i32.and (local.get $mem) (i32.const 2)) (i32.const 2))
-        (then nop)
-        (else unreachable)
+      (then nop)
+      (else (return i32.const 0))
     )
     (i32.load (i32.shr_u (local.get $mem) (i32.const 2)))
+    (local.set $value)
+
+    (local.get $value)
     (i32.and (i32.const 0x3F))
 
     ;; reufe existing context
@@ -27,6 +31,14 @@
       (then
         (return (local.get $mem))
       )
+    )
+
+    (local.get $value)
+
+    ;; check its heap binary
+    (if (i32.eq (i32.const 0x24))
+      (then (nop))
+      (else (return (i32.const 0)))
     )
 
     (local.set $ptr (call $alloc (i32.const 4) (i32.const 16)))
