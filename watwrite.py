@@ -13,12 +13,12 @@ from write.call import (
   LocalCall, LocalCallDrop, LocalCallTail,
   ExternalCall, ExternalCallDrop, ExternalCallTail,
 )
-from write.bif import Bif
+from write.bif import GcBif, Bif
 from write.block import Label, FuncInfo, BadMatch
 from write.regs import Allocate, Trim, VariableMetaNop, Swap
 from write.proc import Send
 
-from write.utils import make_result_n, make_in_params_n, get_atoms
+from write.utils import make_result_n, make_in_params_n, get_atoms, add_literal
 
 
 MODULE = '''(module
@@ -27,6 +27,10 @@ MODULE = '''(module
    (memory 1)
    (export "memory" (memory 0))
    ;; data section
+
+   (global $__unique__trace_enable (mut i32) (i32.const 0))
+   (global $__trace_enable (mut i32)  (i32.const 0))
+
    {data}
    ;; module body
    {body}
@@ -44,9 +48,6 @@ FUNC_EXPORT = '''
 
 LITERAL = '''
   (data (i32.const {offset}) "{value}")
-'''
-GLOBAL_CONST = '''
-  (global ${name} i32 (i32.const {value}))
 '''
 MEM_NEXT_FREE = '''
   ;; next free memory offset
@@ -73,6 +74,7 @@ def produce_wasm(module):
 
     max_xregs = 1
     max_yregs = 0
+    max_fregs = 0
 
     find_function = module.find_function
 
@@ -88,6 +90,8 @@ def produce_wasm(module):
       atom_id = cls.last_atom_id
       cls.atoms[atom_name] = atom_id
       return (atom_name, atom_id)
+
+  (Ctx.module_name_const, _ignore) = add_literal(Ctx, bytes('Trace: ' + str(module.name) + '            \n', 'latin1'))
 
   for func in module.functions:
     Ctx.max_xregs = max(int(func.arity), 1)
@@ -172,7 +176,8 @@ def produce_wasm(module):
         'call_ext_only': ExternalCallDrop,
         'call_ext_last': ExternalCallTail,
 
-        'gc_bif': Bif,
+        'gc_bif': GcBif,
+        'bif': Bif,
 
         'send': Send,
       }.get(styp)
@@ -183,6 +188,7 @@ def produce_wasm(module):
       else:
         # assert False, f'No support for {styp} added yet'
         print('not implemented', styp)
+        b += f'(nop) ;; ignore unknown opcode {styp}\n'
 
     b += ') ;; end of loop\n'
     b += 'unreachable\n';
@@ -194,6 +200,9 @@ def produce_wasm(module):
 
     for yreg in range(0, Ctx.max_yregs):
       localvars += f'(local $var_yreg_{yreg}_val i32)\n'
+
+    for freg in range(0, Ctx.max_fregs):
+      localvars += f'(local $var_frreg_{freg}_val i32)\n'
 
     localvars += f'(local $temp i32)\n'
     localvars += f'(local $jump i32)\n'

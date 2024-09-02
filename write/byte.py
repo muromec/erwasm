@@ -52,25 +52,105 @@ class BsMatch:
         (i32.const {n})
      )\n'''
 
-  def command_integer(self, ctx, _xn, _literal, s, n, dreg):
-    add_import(ctx, 'minibeam', 'bs_load_integer', 1)
+  def helper_get_integer(self, ctx, s):
+    add_import(ctx, 'minibeam', 'bs_get_integer_ptr', 2)
+    bits_to_read = int(s)
 
+    """
+    ;; wasm doesnt have separate big endian and little instructions,
+    ;; while beam has BE by default -> <<$A, $C>> is 0x4143
+    """
+
+    load8 = """
+          (i32.load8_u)
+    """
+    load16 = """
+          (i32.load16_u)
+          (local.set $temp)
+          (i32.or
+            (i32.shr_u (local.get $temp) (i32.const 8))
+            (i32.and (i32.shl (local.get $temp) (i32.const 8)) (i32.const 0xFF00))
+          )
+    """
+
+    # this is fine
+    load32 = """
+          (i32.load)
+          (local.set $temp)
+
+          (i32.or
+              (i32.or
+                (i32.shr_u (local.get $temp) (i32.const 24))
+                (i32.and (
+                  i32.shr_u (local.get $temp) (i32.const 8)) (i32.const 0xff_00)
+                )
+              )
+              (i32.or
+                (i32.and (
+                  i32.shl (local.get $temp) (i32.const 8)) (i32.const 0xff_00_00)
+                )
+                (i32.and 
+                  (i32.shl (local.get $temp) (i32.const 24)) (i32.const 0xff_00_00_00)
+                )
+              )
+         )
+    """
+    if bits_to_read == 8:
+      load = load8
+      shift = ''
+    elif bits_to_read < 8:
+      load = load8
+      shift_bits = 8 - bits_to_read
+      shift = f'(i32.const {shift_bits}) (i32.shr_u)\n'
+    elif bits_to_read == 16:
+      load = load16
+      shift = ''
+    elif bits_to_read < 16:
+      load = load16
+      shift_bits = 16 - bits_to_read
+      shift = f'(i32.const {shift_bits}) (i32.shr_u)\n'
+    elif bits_to_read == 32:
+      load = load32
+      shift = ''
+    elif bits_to_read < 32:
+      load = load32
+      shift_bits = 32 - bits_to_read
+      shift = f'(i32.const {shift_bits}) (i32.shr_u)\n'
+
+    mask = ''
+    for _ignore in range(0, bits_to_read):
+      mask = mask + '1'
+
+    mask = int(mask, 2)
+
+    return f'''
+      ;; get integer from bs match s={s}, mask={hex(mask)}
+      (call
+        $minibeam_bs_get_integer_ptr_2
+        { push(ctx, *self.sreg) }
+        (i32.const {bits_to_read})
+      )
+      { load }
+      { shift }
+      (i32.const {mask})
+      (i32.and)
+
+    \n'''
+
+  def command_integer(self, ctx, _xn, _literal, s, n, dreg):
+    load = self.helper_get_integer(ctx, s)
     dreg = arg(dreg)
     return f'''
-      ;; get integer from bs match
-      (i32.shl
-        (call
-          $minibeam_bs_load_integer_1
-          { push(ctx, *self.sreg) }
-          (i32.const {s})
-        )
-        (i32.const 4)
-      )
+      { load }
+      ;; shift to erl format
+      (i32.const 4)
+      (i32.shl)
       (i32.or (i32.const 0xF))
+
+      ;; save and ok
       { pop(ctx, *dreg) }
       (i32.const 1)
      \n'''
-
 
   def command_binary(self, ctx, *args):
     return '(unreachable)\n'
@@ -84,16 +164,19 @@ class BsMatch:
         (i32.const {s})
      )\n'''
 
-  def command_eq(self, ctx, _x, s, value):
-    add_import(ctx, 'minibeam', 'bs_load_integer', 1)
+  def command_debug(self, ctx):
+    add_import(ctx, 'minibeam', 'bs_debug', 1)
 
-    return f'''
-      ;; get integer from bs match
-      (call 
-        $minibeam_bs_load_integer_1
+    return f'''(call
+        $minibeam_bs_debug_1
         { push(ctx, *self.sreg) }
-        (i32.const {s})
-      )
+     )\n'''
+
+  def command_eq(self, ctx, _x, s, value):
+    load = self.helper_get_integer(ctx, s)
+    return f'''
+      ;; compare integers
+      { load }
       (i32.const {value})
       (i32.eq)
      \n'''
@@ -200,49 +283,92 @@ class BsCreateBin:
   def to_wat(self, ctx):
     add_import(ctx, 'minibeam', 'get_byte_size', 1)
     add_import(ctx, 'minibeam', 'alloc_binary', 1)
-    add_import(ctx, 'minibeam', 'into_buf', 3)
+    add_import(ctx, 'minibeam', 'into_buf', 4)
 
     next_value = False
+    ops = self.ops[:]
     to_read = []
-    for op in self.ops:
-      if op == 'nil':
-        next_value = True
-        continue
+    while not next_value:
+      next_value = ops.pop(0) == 'nil'
 
-      if not next_value:
-        continue
+    while ops:
+      value = ops.pop(0)
+      if value[0] == 'tr':
+        value = value[1][0]
 
-      if op[0] == 'tr':
-        op = op[1][0]
+      value = populate_stack_with(ctx, value)
 
-      if op[0] == 'string' and not op[1]:
-        continue
+      args = []
+      while ops:
+        arg = ops.pop(0)
+        if arg == 'nil':
+          to_read.append((value, args))
+          break
+        args.append(arg)
 
-      to_read.append(populate_stack_with(ctx, op))
+    to_read.append((value, args))
 
-      next_value = False
     b = ';; bs_create_bin\n'
     b += '(local.set $temp (i32.const 0))\n'
 
-    for segment in to_read:
-      b += f'''
-        { segment }
-        (call $minibeam_get_byte_size_1)
-        (i32.add (local.get $temp))
-        (local.set $temp)
+    def int_size(option):
+      if not isinstance(option, (list, tuple)):
+        return
+      if option[0] == 'integer':
+        return int(option[1][0])
+
+    def match_op(op_name, option):
+      if not isinstance(option, (list, tuple)):
+        return
+      return option[0] == 'atom' and option[1][0] == op_name
+
+    def find_op(values, fn):
+      for value in values:
+        ret = fn(value)
+        if ret is not None:
+          return ret
+
+    for (segment, args) in to_read:
+      needs_measure = any([
+        match_op('all', item)
+        for item in args
+      ])
+      size_bytes = find_op(args, int_size)
+
+      if needs_measure:
+        b += f'''
+          { segment } ;; all= { needs_measure }
+          (call $minibeam_get_byte_size_1)
+        '''
+      else:
+        b += f'''
+          ;; know to be { size_bytes } bytes
+          (i32.const {size_bytes or 4}) ;; this is so wrong
+        '''
+
+      b += '''
+          (i32.add (local.get $temp))
+          (local.set $temp)
       '''
 
     b += '''
-      (call $minibeam_alloc_binary_1 (i32.const 16) (local.get $temp))
+      (call $minibeam_alloc_binary_1 (local.get $temp))
       (local.set $temp)
     '''
 
     b += '(i32.const 0) ;; initial offset 0\n'
-    for segment in to_read:
+    for (segment, args) in to_read:
+      needs_measure = any([
+        match_op('all', item)
+        for item in args
+      ])
+      size_bytes = find_op(args, int_size)
+
       b += f'''
         (local.get $temp)
         { segment }
-        (call $minibeam_into_buf_3)
+        (i32.const {size_bytes or 4})
+        (call $minibeam_into_buf_4)
       '''
 
     b += f'''

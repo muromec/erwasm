@@ -2,6 +2,7 @@
   (import "wasi:cli/stdout@0.2.0" "get-stdout" (func $get_stdout (result i32)))
   (import "wasi:io/streams@0.2.0" "[method]output-stream.blocking-write-and-flush" (func $output_stream_write_flush (param i32 i32 i32 i32)))
 
+  (memory 0)
   (data (i32.const 0) "") ;; 4
   (data (i32.const 4) "Hi\n") ;; 3
   (data (i32.const 8) "0x00000000\n") ;; 18
@@ -77,6 +78,20 @@
 
   (export "erdump#hexlog_1" (func $hexlog))
 
+  (func $display (param $erl_val i32) (result i32)
+      (local $len i32)
+      (call $read_erl_mem (local.get $erl_val) (global.get $__free_mem))
+      (local.set $len)
+      (if (i32.eqz (local.get $len))
+        (then
+          (return (i32.const 0))
+        )
+      )
+      (return (call $log (global.get $__free_mem) (local.get $len)))
+  )
+  (export "minibeam#display_1" (func $display))
+
+
   (func $alloc (param $align i32) (param $size i32) (result i32)
       (local $tmp i32)
       (local $ret i32)
@@ -134,9 +149,6 @@
       (i32.shr_u)
       (local.set $iter_len)
       (local.set $their_ptr (i32.add (local.get $their_ptr) (i32.const 8)))
-
-      (i32.store (local.get $mem_buffer) (local.get $iter_len))
-      (local.set $mem_buffer (i32.add (local.get $mem_buffer) (i32.const 4)))
 
       (loop $iter
         (if (i32.eqz (local.get $iter_len))
@@ -325,9 +337,21 @@
   )
   (export "erdump#write_buf" (func $write_buf))
 
-  (func $copy_into_buf (param $out_offset i32) (param $out_ptr i32) (param $in_ptr i32) (result i32)
+  (func $copy_into_buf (param $out_offset i32) (param $out_ptr i32) (param $in_ptr i32) (param $int_size_bits i32) (result i32)
     (local $len i32)
     (local $mem i32)
+
+    (if (i32.eq (i32.and (local.get $in_ptr) (i32.const 0xF)) (i32.const 0xF))
+        (then
+	   (local.set $mem (global.get $__ret__literal_ptr_raw))
+	   (local.set $len (i32.const 4)) ;; hi fixme
+	   (i32.store (local.get $mem)
+		      (i32.shr_u (local.get $in_ptr) (i32.const 4))
+           )
+           (call $write_into_buf (local.get $out_ptr) (local.get $out_offset) (local.get $mem) (local.get $len)) (drop)
+	   (return (local.get $len))
+	)
+    )
 
     (if (i32.eq (i32.and (local.get $in_ptr) (i32.const 2)) (i32.const 2))
         (then nop)
@@ -349,10 +373,36 @@
 
     (call $write_into_buf (local.get $out_ptr) (local.get $out_offset) (local.get $mem) (local.get $len)) (drop)
 
-    (local.get $len)
+    (i32.add (local.get $len) (local.get $out_offset))
   )
-  (export "minibeam#into_buf_3" (func $copy_into_buf))
+  (export "minibeam#into_buf_4" (func $copy_into_buf))
 
+  (func $trace (param $name_buf i32) (param $line_erl i32) (param $enable i32)
+    (if
+       (i32.or
+         (global.get $__unique__trace_enable)
+         (local.get $enable)
+       )
+       (then
+         (i32.store
+           (i32.add
+	     (local.get $name_buf)
+             (i32.const 28)
+           )
+	   (local.get $line_erl)
+         )
+         (call $display
+	    (i32.or (i32.shl (local.get $name_buf) (i32.const 2)) (i32.const 2))
+	 ) (drop)
+       )
+    )
+  )
+  (export "minibeam#trace_3" (func $trace))
+  (func $trace_enable (result i32)
+    (global.set $__unique__trace_enable (i32.const 1))
+    (i32.const 0x3b)
+  )
+  (export "minibeam#trace_enable_0" (func $trace_enable))
 
 )
 

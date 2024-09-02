@@ -37,28 +37,31 @@ def parse_list_sentence_helper(text, State, end_token, depth):
       ret.append(child_sentence)
     elif state == None and symbol == '<':
       state = 'open_bytes'
+
     elif state == 'open_bytes' and symbol == '<':
       state = 'bytes'
       acc = b''
-    elif state == 'bytes' and symbol == '"':
-      state = 'bytes_str'
-      acc_bytes_str = b''
-    elif state == 'bytes_str' and symbol == '"':
-      state = 'bytes'
-      acc += acc_bytes_str
-      acc_bytes_str = None
     elif state == 'bytes' and symbol == '>':
       state = 'close_bytes'
-      # print('got bytes', acc)
       ret.append(acc)
       acc = None
     elif state == 'close_bytes' and symbol == '>':
       state = None
+    elif state == 'bytes_str' and symbol == '\\':
+      state = 'bytes_str_quote'
+    elif state == 'bytes_str' and symbol == '"':
+      state = 'bytes'
+      acc += acc_bytes_str
+      acc_bytes_str = None
+    elif state == 'bytes_str' or state == 'bytes_str_quote':
+      state = 'bytes_str'
+      acc_bytes_str += bytes(symbol, 'utf8')
+    elif state == 'bytes' and symbol == '"':
+      state = 'bytes_str'
+      acc_bytes_str = b''
     elif state == 'bytes':
       assert False
       acc += symbol
-    elif state == 'bytes_str':
-      acc_bytes_str += bytes(symbol, 'utf8')
     elif state == None and is_num(symbol):
       state = 'num'
       acc = symbol
@@ -121,7 +124,7 @@ def parse_list_sentence_helper(text, State, end_token, depth):
     elif state == None and symbol in ['[']:
       assert False, 'cant be!'
 
-    if symbol == end_token:
+    if state == None and symbol == end_token:
       break
 
     if end_token == state and ret:
@@ -155,7 +158,7 @@ def parse_sentence_helper(text, State, depth):
     child_sentence_old = (child_sentence[0], list(child_sentence[1:]))
     return child_sentence_old
 
-  return child_sentence
+  return tuple(child_sentence)
 
 
 def parse_sentence(text):

@@ -46,18 +46,22 @@ def pop(ctx, typ, num):
     ctx.max_xregs = max(ctx.max_xregs, num + 1)
   elif typ == 'y':
     ctx.max_yregs = max(ctx.max_yregs, num + 1)
+  elif typ == 'fr':
+    ctx.max_fregs = max(ctx.max_fregs, num + 1)
   else:
     assert False
 
   return f'(local.set $var_{typ}reg_{num}_val)\n'
 
 def push(ctx, typ, num):
-  assert typ in ['x', 'y']
-
   if typ == 'x':
     ctx.max_xregs = max(ctx.max_xregs, num + 1)
-  if typ == 'y':
-    ctx.max_yregs = max(ctx.max_yregs, num, + 1)
+  elif typ == 'y':
+    ctx.max_yregs = max(ctx.max_yregs, num + 1)
+  elif typ == 'fr':
+    ctx.max_fregs = max(ctx.max_fregs, num + 1)
+  else:
+    assert False
 
   return f'(local.get $var_{typ}reg_{num}_val)\n'
 
@@ -98,7 +102,7 @@ def populate_stack_with(ctx, value):
   elif typ == 'literal' or typ == 'string':
     (_offset, literal_name) = add_literal(ctx, val)
     b += f'(global.get ${literal_name})\n'
-  elif typ == 'x' or typ == 'y':
+  elif typ == 'x' or typ == 'y' or typ == 'fr':
     b += push(ctx, typ, int(val))
   else:
     assert False, 'not implemented {typ}'.format(typ=typ)

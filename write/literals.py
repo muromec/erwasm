@@ -40,7 +40,7 @@ def add_literal(ctx, sval):
     name = name,
     value = (ctx.literalidx << 2) | 2,
   )
-  ctx.data += f';; erlang value {repr(sval)}\n'
+  ctx.data += f';; erlang value {repr(sval)}, {type(sval)} \n'
 
   offset = ctx.literalidx + 0
   ctx.literalidx += len(packed_value)
