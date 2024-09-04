@@ -42,7 +42,7 @@ class Line:
         (global.get $__{ctx.module_name_const}__literal_ptr_raw)
         (i32.const {line_erl})
         (global.get $__trace_enable)
-      )
+      ) (drop)
       '''
 
     return b

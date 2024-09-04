@@ -6,7 +6,7 @@
   (data (i32.const 0) "") ;; 4
   (data (i32.const 4) "Hi\n") ;; 3
   (data (i32.const 8) "0x00000000\n") ;; 18
-
+  (global $__unique__trace_enable (mut i32) (i32.const 0) (mut i32) (i32.const 0))
   (global $__ret__literal_ptr_raw i32 (i32.const 0))
   (global $__hi__literal_ptr_raw i32 (i32.const 4))
   (global $__buffer__literal_ptr_raw i32 (i32.const 8))
@@ -377,7 +377,7 @@
   )
   (export "minibeam#into_buf_4" (func $copy_into_buf))
 
-  (func $trace (param $name_buf i32) (param $line_erl i32) (param $enable i32)
+  (func $trace (param $name_buf i32) (param $line_erl i32) (param $enable i32) (result i32)
     (if
        (i32.or
          (global.get $__unique__trace_enable)
@@ -396,6 +396,7 @@
 	 ) (drop)
        )
     )
+    (i32.const 0x3b)
   )
   (export "minibeam#trace_3" (func $trace))
   (func $trace_enable (result i32)

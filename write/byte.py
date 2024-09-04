@@ -34,20 +34,20 @@ class BsMatch:
     return b
 
   def command_ensure_at_least(self, ctx, s, n):
-    add_import(ctx, 'minibeam', 'bs_ensure_at_least', 2)
+    add_import(ctx, 'minibeam', 'bs_ensure_at_least', 3)
 
     return f'''(call 
-        $minibeam_bs_ensure_at_least_2
+        $minibeam_bs_ensure_at_least_3
         { push(ctx, *self.sreg) }
         (i32.const {s})
         (i32.const {n})
      )\n'''
 
   def command_ensure_exactly(self, ctx, n):
-    add_import(ctx, 'minibeam', 'bs_ensure_exactly', 1)
+    add_import(ctx, 'minibeam', 'bs_ensure_exactly', 2)
 
     return f'''(call
-        $minibeam_bs_ensure_exactly_1
+        $minibeam_bs_ensure_exactly_2
         { push(ctx, *self.sreg) }
         (i32.const {n})
      )\n'''
@@ -156,10 +156,10 @@ class BsMatch:
     return '(unreachable)\n'
 
   def command_skip(self, ctx, s):
-    add_import(ctx, 'minibeam', 'bs_skip', 1)
+    add_import(ctx, 'minibeam', 'bs_skip', 2)
 
     return f'''(call
-        $minibeam_bs_skip_1
+        $minibeam_bs_skip_2
         { push(ctx, *self.sreg) }
         (i32.const {s})
      )\n'''
@@ -188,13 +188,13 @@ class BsGetPosition:
      self.dreg = arg(darg)
 
   def to_wat(self, ctx):
-    add_import(ctx, 'minibeam', 'bs_get_position', 0)
+    add_import(ctx, 'minibeam', 'bs_get_position', 1)
 
     return f'''
       ;; get integer from bs_get_position
       (i32.shl
         (call
-          $minibeam_bs_get_position_0
+          $minibeam_bs_get_position_1
           { push(ctx, *self.sreg) }
         )
         (i32.const 4)
@@ -205,20 +205,21 @@ class BsGetPosition:
 
 
 class BsSetPosition:
-  def __init__(self, sarg, darg):
-    self.sreg = arg(sarg)
-    self.dreg = arg(darg)
+  def __init__(self, sarg1, sarg2):
+    self.sreg1 = arg(sarg1)
+    self.sreg2 = arg(sarg2)
 
   def to_wat(self, ctx):
-    add_import(ctx, 'minibeam', 'bs_set_position', 1)
+    add_import(ctx, 'minibeam', 'bs_set_position', 2)
 
     return f'''
       ;; pass integer to set position
       (call
-        $minibeam_bs_set_position_1
-        { push(ctx, *self.sreg) }
-        (i32.shr_u { push(ctx, *self.dreg) } (i32.const 4))
+        $minibeam_bs_set_position_2
+        { push(ctx, *self.sreg1) }
+        (i32.shr_u { push(ctx, *self.sreg2) } (i32.const 4))
       )
+      (drop)
      \n'''
 
 
@@ -229,12 +230,12 @@ class BsGetTail:
     self.max_regs = max_regs
 
   def to_wat(self, ctx):
-    add_import(ctx, 'minibeam', 'bs_get_tail', 0)
+    add_import(ctx, 'minibeam', 'bs_get_tail', 1)
 
     return f'''
       ;; get tail bytes from context
       (call
-        $minibeam_bs_get_tail_0
+        $minibeam_bs_get_tail_1
         { push(ctx, *self.sreg) }
       )
       { pop(ctx, *self.dreg) }
@@ -263,11 +264,11 @@ class BsStartMatch:
 
       return b + populate_with(ctx, *self.dreg, self.sarg)
     if self.op == 'no_fail':
-      add_import(ctx, 'minibeam', 'make_match_context', 1)
+      add_import(ctx, 'minibeam', 'make_match_context', 2)
 
       b += push(ctx, *self.sreg)
       b += '(i32.const 0)\n'
-      b += '(call $minibeam_make_match_context_1)\n'
+      b += '(call $minibeam_make_match_context_2)\n'
       b += pop(ctx, *self.dreg)
       return b
 

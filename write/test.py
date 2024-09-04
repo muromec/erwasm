@@ -350,11 +350,11 @@ class Test5:
     [match_ctx_reg] = self.test_args
     sreg = arg(match_ctx_reg)
 
-    add_import(ctx, 'minibeam', 'make_match_context', 1)
+    add_import(ctx, 'minibeam', 'make_match_context', 2)
     return f'''
       { push(ctx, *sreg) }
       (i32.const 0) ;; do we really need to pass offset?
-      (call $minibeam_make_match_context_1)
+      (call $minibeam_make_match_context_2)
       (local.set $temp)
       (if (i32.eqz (local.get $temp))
         (then (nop))
@@ -368,7 +368,27 @@ class Test5:
     '''
 
   def test_bs_get_utf8(self, ctx):
-    return '(unreachable)\n'
+    add_import(ctx, 'minibeam', 'get_utf8_from_ctx', 1)
+
+    [_tr, [match_ctx_reg, [_reg_type, _n]]] = self.test_args[0]
+    assert _tr == 'tr'
+    assert _reg_type == 't_bs_context'
+
+    return f'''
+      { populate_stack_with(ctx, self.test_args[0]) }
+      (call $minibeam_get_utf8_from_ctx_1)
+      (local.set $temp)
+      (if (i32.eqz (local.get $temp))
+        (then (nop))
+        (else
+          (local.get $temp)
+          { pop(ctx, *self.dreg) }
+        )
+      )
+      (i32.eqz (local.get $temp))
+      (i32.eqz)
+
+    '''
 
   def test_bs_get_utf16(self, ctx):
     return '(unreachable)\n'
