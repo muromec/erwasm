@@ -216,8 +216,6 @@
       )
     ) (drop)
 
-    (call $hexlog (local.get $size)) (drop)
-    (call $hexlog (local.get $offset)) (drop)
     (i32.const 1)
   )
   (export "minibeam#bs_debug_1" (func $bs_debug))
@@ -482,17 +480,32 @@
       )
     )
     (local.set $ret (i32.load (local.get $bin_ptr)))
-    (local.set $bits_consumed (i32.const 8))
+
+    (block $byte_switch
+    (if (i32.eqz (i32.and (local.get $ret) (i32.const 0x80))) ;; 0b0XXX XXXX
+        (then
+          (local.set $bits_consumed (i32.const 8))
+          (br $byte_switch)
+        )
+    )
+    (if (i32.eq (i32.and (local.get $ret) (i32.const 0xE0)) (i32.const 0xC0)) ;; 0b110X XXXX
+        (then
+          (local.set $bits_consumed (i32.const 16))
+          (local.set $ret
+            (i32.or
+              (i32.shl (i32.and (i32.const 0x1F) (local.get $ret)) (i32.const 6))
+              (i32.shr_u (i32.and (i32.const 0x3F00) (local.get $ret)) (i32.const 8))
+            )
+          )
+          (call $hexlog (local.get $ret)) (drop)
+          (br $byte_switch)
+        )
+    )
+    (unreachable)
+    )
 
     (local.set $offset (i32.add (local.get $offset) (local.get $bits_consumed)))
     (i32.store (i32.add (local.get $ptr) (i32.const 8)) (local.get $offset))
-    (call $hexlog (local.get $ret)) (drop)
-    (call $hexlog
-      (i32.and
-        (local.get $ret)
-	(i32.const 0x80)
-      )
-    ) (drop)
 
     (i32.or
       (i32.shl (local.get $ret) (i32.const 4))

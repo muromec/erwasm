@@ -152,8 +152,6 @@ class Bif:
               (i32.xor)
               (local.get $temp)
               (i32.add)
-              (i32.const 4)
-              (i32.add)
               (i32.load)
               (local.set $temp)
             )
