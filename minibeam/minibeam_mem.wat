@@ -409,7 +409,7 @@
     (local $ptr i32)
     (local $erlen i32)
 
-    ;; For N len string, allocate (N + (2 * 4)) mem
+    ;; For N len binary, allocate (N + (2 * 4)) mem
     (local.set $erlen (i32.add (i32.const 8) (local.get $len)))
 
     ;; word align size
