@@ -18,7 +18,7 @@
 
     (if (i32.eq (i32.and (local.get $mem) (i32.const 2)) (i32.const 2))
       (then nop)
-      (else (return i32.const 0))
+      (else (return (i32.const 0)))
     )
     (i32.load (i32.shr_u (local.get $mem) (i32.const 2)))
     (local.set $value)
