@@ -99,7 +99,7 @@
         (then nop)
         (else unreachable)
     )
-    (i32.add 
+    (i32.add
       (i32.shr_u (local.get $offset) (i32.const 3))
       (i32.add (local.get $bin_ptr) (i32.const 8))
     )
@@ -488,6 +488,7 @@
           (br $byte_switch)
         )
     )
+    ;; ї is U+0457 encoded as \xd1\x97
     (if (i32.eq (i32.and (local.get $ret) (i32.const 0xE0)) (i32.const 0xC0)) ;; 0b110X XXXX
         (then
           (local.set $bits_consumed (i32.const 16))
@@ -497,10 +498,51 @@
               (i32.shr_u (i32.and (i32.const 0x3F00) (local.get $ret)) (i32.const 8))
             )
           )
-          (call $hexlog (local.get $ret)) (drop)
           (br $byte_switch)
         )
     )
+    ;; つ is U+3064, encoded as \xe3\x81\xa4
+    ;; hex(
+    ;;   (u8be & 0x3F_00_00) >> 16 |
+    ;;   (u8be & 0x00_3F_00) >> 2  |
+    ;;   (u8be & 0x00_00_0F) << 12
+    ;; )
+   (if (i32.eq (i32.and (local.get $ret) (i32.const 0xF0)) (i32.const 0xE0)) ;; 0b1110 XXXX
+        (then
+          (local.set $bits_consumed (i32.const 24))
+          (local.set $ret
+            (i32.or
+            (i32.or
+              (i32.shl (i32.and (i32.const 0x0F) (local.get $ret)) (i32.const 12))
+              (i32.shr_u (i32.and (i32.const 0x3F00) (local.get $ret)) (i32.const 2))
+              (i32.shr_u (i32.and (i32.const 0x3F0000) (local.get $ret)) (i32.const 16))
+            )
+            )
+          )
+          (br $byte_switch)
+        )
+    )
+    ;; 🌞 is U+1F31E encoded as \xf0\x9f\x8c\x9E
+    ;; hex((u8 & 0x07_00_00_00) >> 8 | (u8 & 0x3F_00_00) >> 4 | (u8 & 0x00_3F_00) >> 2 | (u8 & 0x00_00_3F))
+    (if (i32.eq (i32.and (local.get $ret) (i32.const 0xF8)) (i32.const 0xF0)) ;; 0b1111 0XXX
+        (then
+          (local.set $bits_consumed (i32.const 32))
+          (local.set $ret
+            (i32.or
+              (i32.or
+                (i32.shl (i32.and (i32.const 0x07) (local.get $ret)) (i32.const 16))
+                (i32.shl (i32.and (i32.const 0x3F00) (local.get $ret)) (i32.const 4))
+              )
+              (i32.or
+                (i32.shr_u (i32.and (i32.const 0x3F_00_00) (local.get $ret)) (i32.const 10))
+                (i32.shr_u (i32.and (i32.const 0x3F_00_00_00) (local.get $ret)) (i32.const 24))
+              )
+            )
+          )
+          (br $byte_switch)
+        )
+    )
+
     (unreachable)
     )
 

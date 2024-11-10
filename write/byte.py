@@ -368,7 +368,7 @@ class BsCreateBin:
       b += f'''
         (local.get $temp)
         { segment }
-        (i32.const {size_bytes or 4})
+        (i32.const {size_bytes or 32})
         (call $minibeam_into_buf_4)
       '''
 

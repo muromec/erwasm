@@ -10,6 +10,8 @@
   (global $__ret__literal_ptr_raw i32 (i32.const 0))
   (global $__hi__literal_ptr_raw i32 (i32.const 4))
   (global $__buffer__literal_ptr_raw i32 (i32.const 8))
+  (global $__nbuffer__literal_ptr_raw i32 (i32.const 10))
+
 
   (global $__free_mem (mut i32) (i32.const 26))
 
@@ -61,12 +63,141 @@
       )
   )
 
+  ;; this is terribly suboptimal as it does BE-LE conversion
+  (func $int_bin_helper (param $value i32) (param $int_bits i32) (result i32)
+    (local.get $value)
+    (i32.const 4)
+    (i32.shr_u)
+    (local.set $value)
+
+    (if
+      (i32.eq (local.get $int_bits) (i32.const 8))
+      (then
+        (i32.store8
+          (global.get $__nbuffer__literal_ptr_raw)
+          (local.get $value)
+        )
+        (return (i32.const 1))
+      )
+    )
+    (if
+      (i32.eq (local.get $int_bits) (i32.const 16))
+      (then
+        (i32.store8
+          (i32.add
+            (global.get $__nbuffer__literal_ptr_raw)
+            (i32.const 1)
+          )
+          (i32.and (local.get $value) (i32.const 0xFF))
+        )
+        (i32.store8
+          (i32.add
+            (global.get $__nbuffer__literal_ptr_raw)
+            (i32.const 0)
+          )
+          (i32.and
+            (i32.shr_u (local.get $value) (i32.const 8))
+            (i32.const 0xFF)
+          )
+        )
+        (return (i32.const 2))
+      )
+    )
+    (if
+      (i32.eq (local.get $int_bits) (i32.const 32))
+      (then
+        (i32.store8
+          (i32.add
+            (global.get $__nbuffer__literal_ptr_raw)
+            (i32.const 3)
+          )
+          (i32.and (local.get $value) (i32.const 0xFF))
+        )
+        (i32.store8
+          (i32.add
+            (global.get $__nbuffer__literal_ptr_raw)
+            (i32.const 2)
+          )
+          (i32.and
+            (i32.shr_u (local.get $value) (i32.const 8))
+            (i32.const 0xFF)
+          )
+        )
+        (i32.store8
+          (i32.add
+            (global.get $__nbuffer__literal_ptr_raw)
+            (i32.const 1)
+          )
+          (i32.and
+            (i32.shr_u (local.get $value) (i32.const 16))
+            (i32.const 0xFF)
+          )
+        )
+        (i32.store8
+          (i32.add
+            (global.get $__nbuffer__literal_ptr_raw)
+            (i32.const 0)
+          )
+          (i32.and
+            (i32.shr_u (local.get $value) (i32.const 24))
+            (i32.const 0xFF)
+          )
+        )
+
+        (return (i32.const 4))
+      )
+    )
+    (if
+      (i32.eq (local.get $int_bits) (i32.const 24))
+      (then
+        (i32.store8
+          (i32.add
+            (global.get $__nbuffer__literal_ptr_raw)
+            (i32.const 2)
+          )
+          (i32.and (local.get $value) (i32.const 0xFF))
+        )
+        (i32.store8
+          (i32.add
+            (global.get $__nbuffer__literal_ptr_raw)
+            (i32.const 1)
+          )
+          (i32.and
+            (i32.shr_u (local.get $value) (i32.const 8))
+            (i32.const 0xFF)
+          )
+        )
+        (i32.store8
+          (i32.add
+            (global.get $__nbuffer__literal_ptr_raw)
+            (i32.const 0)
+          )
+          (i32.and
+            (i32.shr_u (local.get $value) (i32.const 16))
+            (i32.const 0xFF)
+          )
+        )
+
+        (return (i32.const 3))
+      )
+    )
+    (unreachable)
+  )
+
+  (func $int_format_helper (param $value i32) (result i32)
+    (local.get $value)
+    (i32.const 4)
+    (i32.shr_u)
+    (call $hexlog_format)
+    (i32.const 10)
+  )
+
   (func $serialize_int (param $value i32) (result i32)
-      (local.get $value)
-      (i32.const 4)
-      (i32.shr_u)
-      (call $hexlog_format)
-      (call $write_buf (global.get $__buffer__literal_ptr_raw ) (i32.const 10))
+    (local $len i32)
+    (local.set $len
+      (call $int_format_helper (local.get $value))
+    )
+    (call $write_buf (global.get $__buffer__literal_ptr_raw ) (local.get $len))
   )
 
   (export "erlang#integer_to_binary_1" (func $serialize_int))
@@ -343,13 +474,12 @@
 
     (if (i32.eq (i32.and (local.get $in_ptr) (i32.const 0xF)) (i32.const 0xF))
         (then
-	   (local.set $mem (global.get $__ret__literal_ptr_raw))
-	   (local.set $len (i32.const 4)) ;; hi fixme
-	   (i32.store (local.get $mem)
-		      (i32.shr_u (local.get $in_ptr) (i32.const 4))
+           (local.set $len
+             (call $int_bin_helper (local.get $in_ptr) (local.get $int_size_bits))
            )
+	   (local.set $mem (global.get $__nbuffer__literal_ptr_raw))
            (call $write_into_buf (local.get $out_ptr) (local.get $out_offset) (local.get $mem) (local.get $len)) (drop)
-	   (return (local.get $len))
+	   (return (i32.add (local.get $len) (local.get $out_offset)))
 	)
     )
 
@@ -366,7 +496,7 @@
         (else (unreachable))
     )
     (i32.load (i32.add (local.get $in_ptr) (i32.const 4)))
-    (i32.const 3) 
+    (i32.const 3)
     (i32.shr_u) ;; size in bytes
     (local.set $len)
     (local.set $mem (i32.add (i32.const 8) (local.get $in_ptr)))
