@@ -5,15 +5,18 @@
   (memory 0)
   (data (i32.const 0) "") ;; 4
   (data (i32.const 4) "Hi\n") ;; 3
-  (data (i32.const 8) "0x00000000\n") ;; 18
+  (data (i32.const 8)  "0x00000000\n") ;; 18
+  (data (i32.const 32) "00000000000\00\00") ;; 44
+
   (global $__unique__trace_enable (mut i32) (i32.const 0) (mut i32) (i32.const 0))
   (global $__ret__literal_ptr_raw i32 (i32.const 0))
   (global $__hi__literal_ptr_raw i32 (i32.const 4))
   (global $__buffer__literal_ptr_raw i32 (i32.const 8))
   (global $__nbuffer__literal_ptr_raw i32 (i32.const 10))
+  (global $__dec_buffer__literal_ptr_raw i32 (i32.const 32))
 
 
-  (global $__free_mem (mut i32) (i32.const 26))
+  (global $__free_mem (mut i32) (i32.const 44))
 
   (func $write_flush (param $stream i32) (param $ptr i32) (param $len i32) (result i32)
       ;; pass four args to write method
@@ -61,6 +64,49 @@
       (local.get $len)
       (if (i32.eqz) (then) (else (br $loop)))
       )
+  )
+
+  (func $dec_format (param $value i32) (result i32)
+      (local $buf i32)
+      (local $rem i32)
+      (local $pos i32)
+
+      (local.set $buf
+        (i32.add
+          (global.get $__dec_buffer__literal_ptr_raw)
+          (i32.const 10)
+        )
+      )
+      (local.set $pos (i32.const 10))
+
+      (loop $loop
+        (local.get $buf)
+        (i32.rem_u
+          (local.get $value)
+          (i32.const 10)
+        )
+        (i32.const 0x30)
+        (i32.add)
+        (i32.store8)
+
+        (i32.div_u
+          (local.get $value)
+          (i32.const 10)
+        )
+        (local.set $value)
+
+        (local.set $pos (i32.sub (local.get $pos) (i32.const 1)))
+        (local.set $buf (i32.sub (local.get $buf) (i32.const 1)))
+
+        (if (i32.eqz (local.get $pos))
+            (then (unreachable))
+        )
+        (if (i32.eqz (local.get $value))
+            (then (nop))
+            (else (br $loop))
+        )
+      )
+      (local.get $pos)
   )
 
   ;; this is terribly suboptimal as it does BE-LE conversion
@@ -184,20 +230,25 @@
     (unreachable)
   )
 
-  (func $int_format_helper (param $value i32) (result i32)
+  (func $serialize_int (param $value i32) (result i32)
+    (local $len i32)
+
     (local.get $value)
     (i32.const 4)
     (i32.shr_u)
-    (call $hexlog_format)
-    (i32.const 10)
-  )
 
-  (func $serialize_int (param $value i32) (result i32)
-    (local $len i32)
-    (local.set $len
-      (call $int_format_helper (local.get $value))
+
+    (call $dec_format)
+    (local.set $len)
+
+    (i32.add
+      (global.get $__dec_buffer__literal_ptr_raw)
+      (local.get $len)
     )
-    (call $write_buf (global.get $__buffer__literal_ptr_raw ) (local.get $len))
+    (i32.const 1) ;; yep, it's off by one
+    (i32.add)
+    (i32.sub (i32.const 10) (local.get $len))
+    (call $write_buf)
   )
 
   (export "erlang#integer_to_binary_1" (func $serialize_int))
