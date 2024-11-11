@@ -629,35 +629,30 @@
 
   (export "minibeam#bs_get_tail_1" (func $bs_get_tail))
 
-  (func $byte_size_bin (param $ptr i32) (result i32)
+  (func $bit_size_bin (param $ptr i32) (result i32)
     (local $size i32)
     (i32.load (i32.add (local.get $ptr) (i32.const 4)))
-    (local.set $size)
-
-    (i32.shr_u (local.get $size) (i32.const 3)) ;; was in bits
   )
 
-  (func $byte_size_ctx (param $ptr i32) (result i32)
+  (func $bit_size_ctx (param $ptr i32) (result i32)
     (local $full_size i32)
     (local $bin_ptr i32)
     (local $offset i32)
 
     (i32.load (i32.add (local.get $ptr) (i32.const 4)))
     (local.set $bin_ptr)
-    (call $get_byte_size (local.get $bin_ptr))
-    (local.set $full_size) ;; in bytes
+    (call $get_bit_size (local.get $bin_ptr))
+    (local.set $full_size) ;; in bits
 
     ;; offset is in bits
     (i32.load (i32.add (local.get $ptr) (i32.const 8)))
-    (local.set $offset)
-    (i32.shr_u (local.get $offset) (i32.const 3)) ;; was in bits
     (local.set $offset)
 
     (i32.sub (local.get $full_size) (local.get $offset))
   )
 
 
-  (func $get_byte_size (param $mem i32) (result i32)
+  (func $get_bit_size (param $mem i32) (result i32)
     (local $ptr i32)
 
     (if (i32.eq (i32.and (local.get $mem) (i32.const 2)) (i32.const 2))
@@ -670,7 +665,7 @@
     (i32.and (i32.const 0x3F))
     (if (i32.eq (i32.const 0x24)) ;; has to be binary
         (then
-          (return (call $byte_size_bin (local.get $ptr)))
+          (return (call $bit_size_bin (local.get $ptr)))
         )
     )
 
@@ -678,13 +673,55 @@
     (i32.and (i32.const 0x3F))
     (if (i32.eq (i32.const 0x4)) ;; has to be match ctx
         (then
-          (return (call $byte_size_ctx (local.get $ptr)))
+          (return (call $bit_size_ctx (local.get $ptr)))
         )
     )
 
     (unreachable)
   )
-  (export "minibeam#get_byte_size_1" (func $get_byte_size))
+  (export "minibeam#get_bit_size_1" (func $get_bit_size))
+
+  (func $get_bit_size_utf8 (param $v i32) (result i32)
+    (local.set $v (i32.shr_u (local.get $v) (i32.const 4)))
+    (if
+      (i32.le_u (local.get $v) (i32.const 0x7F))
+      (then (return (i32.const 8)))
+    )
+    (if
+      (i32.le_u (local.get $v) (i32.const 0x7FF))
+      (then (return (i32.const 16)))
+    )
+    (if
+      (i32.le_u (local.get $v) (i32.const 0xFFFF))
+      (then (return (i32.const 24)))
+    )
+
+    (if
+      (i32.le_u (local.get $v) (i32.const 0x10FFFF))
+      (then (return (i32.const 32)))
+    )
+    (unreachable)
+  )
+  (export "minibeam#get_bit_size_utf8_1" (func $get_bit_size_utf8))
+
+  (func $get_bit_size_utf16 (param $v i32) (result i32)
+    (local.set $v (i32.shr_u (local.get $v) (i32.const 4)))
+    (if
+      (i32.le_u (local.get $v) (i32.const 0xFF_FF))
+      (then
+        (return (i32.const 16))
+      )
+    )
+    (if
+      (i32.le_u (local.get $v) (i32.const 0x10_FF_FF))
+      (then
+        (return (i32.const 32))
+      )
+    )
+    (unreachable)
+  )
+
+  (export "minibeam#get_bit_size_utf16_1" (func $get_bit_size_utf16))
 
   (func $binary_part_3 (param $mem i32) (param $pos i32) (param $len i32) (result i32)
     (local $ptr i32)

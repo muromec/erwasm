@@ -405,30 +405,35 @@
 
   (export "erdump#write_str" (func $write_str))
 
+  ;; len is in bits
   (func $alloc_write_buf (param $len i32) (result i32)
     (local $ptr i32)
     (local $erlen i32)
 
     ;; For N len binary, allocate (N + (2 * 4)) mem
-    (local.set $erlen (i32.add (i32.const 8) (local.get $len)))
+    (local.set $erlen (i32.add (i32.const 64) (local.get $len)))
+    (if (i32.eq (i32.const 0xA) (local.get $len))
+       (then (unreachable))
+    )
 
     ;; word align size
     (i32.shl
-      (i32.shr_u (local.get $erlen) (i32.const 2))
-      (i32.const 2)
+      (i32.shr_u (local.get $erlen) (i32.const 5))
+      (i32.const 5)
     )
-    (i32.add (i32.const 4))
+    (i32.add (i32.const 32))
     (local.set $erlen)
 
-    (local.set $ptr (call $alloc (i32.const 4) (local.get $erlen)))
+    (local.set $ptr (call $alloc (i32.const 4) (i32.shr_u (local.get $erlen) (i32.const 3))))
 
     ;; write header
     (i32.store (local.get $ptr) (i32.const 0x24)) ;; 0 tag heap binary
 
     (i32.store ;; 1 binary size in bits
       (i32.add (i32.const 4) (local.get $ptr))
-      (i32.shl (local.get $len) (i32.const 3))
+      (local.get $len)
     )
+
     (local.get $ptr)
   )
   (export "minibeam#alloc_binary_1" (func $alloc_write_buf))
@@ -460,7 +465,7 @@
     (local $ret i32)
     (local $erlen i32)
 
-    (call $alloc_write_buf (local.get $len))
+    (call $alloc_write_buf (i32.shl (local.get $len) (i32.const 3)))
     (local.set $ret)
     (call $write_into_buf (local.get $ret) (i32.const 0) (local.get $mem) (local.get $len)) (drop)
 
@@ -506,6 +511,293 @@
     (i32.add (local.get $len) (local.get $out_offset))
   )
   (export "minibeam#into_buf_4" (func $copy_into_buf))
+
+  (func $copy_into_buf_utf8 (param $out_offset i32) (param $out_ptr i32) (param $in_ptr i32) (result i32)
+    (local $len i32)
+    (local $mem i32)
+    (local $value i32)
+
+    (local.set $mem (global.get $__nbuffer__literal_ptr_raw))
+
+    (if (i32.eq (i32.and (local.get $in_ptr) (i32.const 0xF)) (i32.const 0xF))
+        (then (nop))
+        (else (unreachable))
+    )
+
+    (local.set $value (i32.shr_u (local.get $in_ptr) (i32.const 4)))
+    (block $bytes
+
+    (if
+      (i32.le_u (local.get $value) (i32.const 0x7F))
+      (then
+        (local.set $len (i32.const 8))
+        (i32.store8 (local.get $mem) (local.get $value))
+
+        (call $write_into_buf (local.get $out_ptr) (local.get $out_offset) (local.get $mem) (local.get $len)) (drop)
+        (br $bytes)
+      )
+    )
+
+    (if
+      (i32.le_u (local.get $value) (i32.const 0x7FF))
+      (then
+        (local.set $len (i32.const 16))
+
+        ;; write lower byte first
+        (local.get $mem)
+        (i32.const 1)
+        (i32.add)
+
+        ;; lower byte has 6 bits and 0b10 header
+        (local.get $value)
+        (i32.const 0x3F)
+        (i32.and)
+        (i32.const 0x80)
+        (i32.or)
+        (i32.store8)
+
+        ;; discard 6 bits already written
+        ;; and add 0b110 header
+        (local.get $mem)
+        (local.get $value)
+        (i32.const 6)
+        (i32.shr_u)
+        (i32.const 0xC0)
+        (i32.or)
+        (i32.store8)
+
+        (call $write_into_buf (local.get $out_ptr) (local.get $out_offset) (local.get $mem) (local.get $len)) (drop)
+        (br $bytes)
+      )
+    )
+
+    (if
+      (i32.le_u (local.get $value) (i32.const 0xFFFF))
+      (then
+        (local.set $len (i32.const 24))
+
+        ;; write lower byte first
+        (local.get $mem)
+        (i32.const 2)
+        (i32.add)
+
+        ;; lower byte has 6 bits and 0b10 header
+        (local.get $value)
+        (i32.const 0x3F)
+        (i32.and)
+        (i32.const 0x80)
+        (i32.or)
+        (i32.store8)
+
+        ;; discard 6 bits already written
+        ;; and add 0b10 header
+        ;; again use only 6 bits
+        (local.get $mem)
+        (i32.const 1)
+        (i32.add)
+
+        (local.get $value)
+        (i32.const 6)
+        (i32.shr_u)
+        (i32.const 0x3F)
+        (i32.and)
+        (i32.const 0x80)
+        (i32.or)
+        (i32.store8)
+
+        ;; discard 12 bits already written
+        ;; and add 0b1110 header
+        ;; again use only 6 bits
+        (local.get $mem)
+        (local.get $value)
+        (i32.const 12)
+        (i32.shr_u)
+        (i32.const 0xE0)
+        (i32.or)
+        (i32.store8)
+        (call $write_into_buf (local.get $out_ptr) (local.get $out_offset) (local.get $mem) (local.get $len)) (drop)
+        (br $bytes)
+      )
+    )
+
+    (if
+      (i32.le_u (local.get $value) (i32.const 0x10FFFF))
+      (then
+        (local.set $len (i32.const 32))
+
+        ;; write lower byte first
+        (local.get $mem)
+        (i32.const 3)
+        (i32.add)
+
+        ;; lower byte has 6 bits and 0b10 header
+        (local.get $value)
+        (i32.const 0x3F)
+        (i32.and)
+        (i32.const 0x80)
+        (i32.or)
+        (i32.store8)
+
+        ;; discard 6 bits already written
+        ;; and add 0b10 header
+        ;; again use only 6 bits
+        (local.get $mem)
+        (i32.const 2)
+        (i32.add)
+
+        (local.get $value)
+        (i32.const 6)
+        (i32.shr_u)
+        (i32.const 0x3F)
+        (i32.and)
+        (i32.const 0x80)
+        (i32.or)
+        (i32.store8)
+
+        ;; discard 12 bits already written
+        ;; and add 0b10 header
+        ;; again use only 6 bits
+        (local.get $mem)
+        (i32.const 1)
+        (i32.add)
+
+        (local.get $value)
+        (i32.const 12)
+        (i32.shr_u)
+        (i32.const 0x3F)
+        (i32.and)
+        (i32.const 0x80)
+        (i32.or)
+        (i32.store8)
+
+        ;; discard 18 bits already written
+        ;; and add 0b1110 header
+        ;; again use only 6 bits
+        (local.get $mem)
+        (local.get $value)
+        (i32.const 18)
+        (i32.shr_u)
+        (i32.const 0xF0)
+        (i32.or)
+        (i32.store8)
+        (call $write_into_buf (local.get $out_ptr) (local.get $out_offset) (local.get $mem) (local.get $len)) (drop)
+        (br $bytes)
+      )
+    )
+
+    (unreachable)
+    )
+
+    (return (i32.add (local.get $len) (local.get $out_offset)))
+   )
+
+  (export "minibeam#into_buf_utf8_3" (func $copy_into_buf_utf8))
+
+  (func $copy_into_buf_utf16 (param $out_offset i32) (param $out_ptr i32) (param $in_ptr i32) (result i32)
+    (local $len i32)
+    (local $mem i32)
+    (local $value i32)
+
+    (local.set $mem (global.get $__nbuffer__literal_ptr_raw))
+
+    (if (i32.eq (i32.and (local.get $in_ptr) (i32.const 0xF)) (i32.const 0xF))
+        (then (nop))
+        (else (unreachable))
+    )
+    (local.set $value (i32.shr_u (local.get $in_ptr) (i32.const 4)))
+
+    (block $bytes
+    (if
+      (i32.le_u (local.get $value) (i32.const 0xFF_FF))
+      (then
+        (local.set $len (i32.const 16))
+
+        ;; l
+        (local.get $mem)
+        (i32.const 1)
+        (i32.add)
+        (local.get $value)
+        (i32.const 0xFF) ;; 8 lower bits
+        (i32.and)
+        (i32.store8)
+
+        ;; h
+        (local.get $mem)
+        (local.get $value)
+        (i32.const 8)
+        (i32.shr_u)
+        (i32.const 0xFF) ;; 8 lower bits
+        (i32.and)
+        (i32.store8)
+
+
+        (call $write_into_buf (local.get $out_ptr) (local.get $out_offset) (local.get $mem) (local.get $len)) (drop)
+        (br $bytes)
+      )
+    )
+    (if
+      (i32.le_u (local.get $value) (i32.const 0x10_FF_FF))
+      (then
+        ;; leave lower 10 bits
+        (local.set $value (i32.and (local.get $value) (i32.const 0xff_ff)))
+        (local.set $len (i32.const 32))
+
+        ;; l1
+        (local.get $mem)
+        (i32.const 3)
+        (i32.add)
+        (local.get $value)
+        (i32.const 0xFF) ;; 8 lower bits
+        (i32.and)
+        (i32.store8)
+
+        ;; l0
+        (local.get $mem)
+        (i32.const 2)
+        (i32.add)
+        (local.get $value)
+        (i32.const 8)
+        (i32.shr_u)
+        (i32.const 0x3) ;; 2 bytes of the lower 10
+        (i32.and)
+        (i32.const 0xDC)
+        (i32.or)
+        (i32.store8)
+
+        ;; h1
+        (local.get $mem)
+        (i32.const 1)
+        (i32.add)
+        (local.get $value)
+        (i32.const 10)
+        (i32.shr_u)
+        (i32.const 0xFF) ;; 8 lower bits
+        (i32.and)
+        (i32.store8)
+
+        ;; h0
+        (local.get $mem)
+        (local.get $value)
+        (i32.const 18)
+        (i32.shr_u)
+        (i32.const 0x3) ;; 2 bytes of the lower 10
+        (i32.and)
+        (i32.const 0xD8)
+        (i32.or)
+        (i32.store8)
+
+        (call $write_into_buf (local.get $out_ptr) (local.get $out_offset) (local.get $mem) (local.get $len)) (drop)
+        (br $bytes)
+      )
+    )
+
+    (unreachable)
+    )
+
+    (return (i32.add (local.get $len) (local.get $out_offset)))
+   )
+
+  (export "minibeam#into_buf_utf16_3" (func $copy_into_buf_utf16))
 
   (func $trace (param $name_buf i32) (param $line_erl i32) (param $enable i32) (result i32)
     (if

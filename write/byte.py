@@ -282,18 +282,25 @@ class BsCreateBin:
     self.ops = ops
 
   def to_wat(self, ctx):
-    add_import(ctx, 'minibeam', 'get_byte_size', 1)
+    add_import(ctx, 'minibeam', 'get_bit_size', 1)
+    add_import(ctx, 'minibeam', 'get_bit_size_utf8', 1)
+    add_import(ctx, 'minibeam', 'get_bit_size_utf16', 1)
     add_import(ctx, 'minibeam', 'alloc_binary', 1)
     add_import(ctx, 'minibeam', 'into_buf', 4)
+    add_import(ctx, 'minibeam', 'into_buf_utf8', 3)
+    add_import(ctx, 'minibeam', 'into_buf_utf16', 3)
 
     next_value = False
     ops = self.ops[:]
     to_read = []
-    while not next_value:
-      next_value = ops.pop(0) == 'nil'
 
     while ops:
+      (_atom, [typ]) = ops.pop(0)
+      _ignore_align = ops.pop(0)
+      unit_size = ops.pop(0)
+      _nil = ops.pop(0)
       value = ops.pop(0)
+
       if value[0] == 'tr':
         value = value[1][0]
 
@@ -302,12 +309,19 @@ class BsCreateBin:
       args = []
       while ops:
         arg = ops.pop(0)
-        if arg == 'nil':
-          to_read.append((value, args))
+        if not isinstance(arg, tuple):
+          pass
+        elif arg[0] == 'atom' and arg[1][0] == 'all':
+          pass
+        elif arg[0] == 'atom' and arg[1][0] == 'undefined':
+          pass
+        elif arg[0] == 'atom':
+          ops.insert(0, arg)
+          to_read.append((value, typ, unit_size, args))
           break
         args.append(arg)
 
-    to_read.append((value, args))
+    to_read.append((value, typ, unit_size, args))
 
     b = ';; bs_create_bin\n'
     b += '(local.set $temp (i32.const 0))\n'
@@ -329,22 +343,46 @@ class BsCreateBin:
         if ret is not None:
           return ret
 
-    for (segment, args) in to_read:
-      needs_measure = any([
-        match_op('all', item)
-        for item in args
-      ])
-      size_bytes = find_op(args, int_size)
+    def type_needs_measure(typ):
+      return (
+        typ == 'append' or
+        typ == 'utf8' or
+        typ == 'utf16' or
+        typ == 'binary'
+      )
 
-      if needs_measure:
+
+    for (segment, typ, unit_size, args) in to_read:
+      needs_measure = type_needs_measure(typ)
+      units = find_op(args, int_size)
+
+      if needs_measure and typ == 'utf8':
         b += f'''
-          { segment } ;; all= { needs_measure }
-          (call $minibeam_get_byte_size_1)
+          { segment } ;; all= { needs_measure }, typ { typ }, { units }
+          (call $minibeam_get_bit_size_utf8_1)
         '''
-      else:
+      elif needs_measure and typ == 'utf16':
         b += f'''
-          ;; know to be { size_bytes } bytes
-          (i32.const {size_bytes or 4}) ;; this is so wrong
+          { segment } ;; all= { needs_measure }, typ { typ }, { units }
+          (call $minibeam_get_bit_size_utf16_1)
+        '''
+
+      elif needs_measure:
+        b += f'''
+          { segment } ;; all= { needs_measure }, typ { typ }, { units }
+          (call $minibeam_get_bit_size_1)
+        '''
+
+      elif units is None:
+        print('v', segment, typ, args)
+        raise ValueError('Segment doesnt have measuring instruction and doesnt have pre defined value too')
+      else:
+        assert units is not None
+        assert unit_size is not None
+        b += f'''
+          ;; known to be { units * unit_size } bits
+          ;; args: { args }
+          (i32.const {units * unit_size})
         '''
 
       b += '''
@@ -358,19 +396,35 @@ class BsCreateBin:
     '''
 
     b += '(i32.const 0) ;; initial offset 0\n'
-    for (segment, args) in to_read:
-      needs_measure = any([
-        match_op('all', item)
-        for item in args
-      ])
-      size_bytes = find_op(args, int_size)
+    for (segment, typ, unit_size, args) in to_read:
+      needs_int_size = typ == 'integer'
+      units = find_op(args, int_size)
 
-      b += f'''
-        (local.get $temp)
-        { segment }
-        (i32.const {size_bytes or 32})
-        (call $minibeam_into_buf_4)
-      '''
+      if needs_int_size:
+         assert units and unit_size
+         bits_size = units * unit_size
+      else:
+         bits_size = 0
+
+      if typ == 'utf8':
+        b += f'''
+          (local.get $temp)
+          { segment }
+          (call $minibeam_into_buf_utf8_3)
+        '''
+      elif typ == 'utf16':
+        b += f'''
+          (local.get $temp)
+          { segment }
+          (call $minibeam_into_buf_utf16_3)
+        '''
+      else:
+        b += f'''
+          (local.get $temp)
+          { segment }
+          (i32.const {bits_size})
+          (call $minibeam_into_buf_4)
+        '''
 
     b += f'''
       (drop)

@@ -42,10 +42,11 @@ class Bif:
       (i32.or (i32.const 0xF))
       '''
     elif self.op == "byte_size":
-      add_import(ctx, 'minibeam', 'get_byte_size', 1)
+      add_import(ctx, 'minibeam', 'get_bit_size', 1)
       b += f'''
-        (call $minibeam_get_byte_size_1)
-        (i32.const 4)
+        (call $minibeam_get_bit_size_1)
+        (i32.const 1) ;; the size in bits, move one more to the left
+                      ;; to fit in integer tag
         (i32.shl)
         (i32.or (i32.const 0xF))
       '''
