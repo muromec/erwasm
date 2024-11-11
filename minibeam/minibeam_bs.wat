@@ -558,6 +558,89 @@
   (export "minibeam#get_utf8_from_ctx_1" (func $bs_get_utf8))
 
 
+  (func $bs_get_utf16 (param $ctx i32) (result i32)
+    (local $ptr i32)
+    (local $bin_ptr i32)
+    (local $offset i32)
+    (local $ret i32)
+    (local $bits_consumed i32)
+
+    (if (i32.eq (i32.and (local.get $ctx) (i32.const 2)) (i32.const 2))
+        (then nop)
+        (else (return (i32.const 0)))
+    )
+    (local.set $ptr (i32.shr_u (local.get $ctx) (i32.const 2)))
+
+    (i32.load (local.get $ptr))
+    (i32.and (i32.const 0x3F))
+    (if (i32.eq (i32.const 4)) ;; has to be match ctx
+        (then nop)
+        (else (return (i32.const 0)))
+    )
+
+    (i32.load (i32.add (local.get $ptr) (i32.const 4)))
+    (local.set $bin_ptr)
+
+    (if (i32.eq (i32.and (local.get $bin_ptr) (i32.const 2)) (i32.const 2))
+        (then nop)
+        (else unreachable)
+    )
+    (local.set $bin_ptr (i32.shr_u (local.get $bin_ptr) (i32.const 2)))
+
+    (i32.load (i32.add (local.get $ptr) (i32.const 8)))
+    (local.set $offset)
+
+    (i32.load (local.get $bin_ptr))
+    (i32.and (i32.const 0x3F))
+    (if (i32.eq (i32.const 0x24)) ;; has to be heap binary
+        (then nop)
+        (else unreachable)
+    )
+    (local.set $bin_ptr
+      (i32.add
+        (i32.shr_u (local.get $offset) (i32.const 3))
+        (i32.add (local.get $bin_ptr) (i32.const 8))
+      )
+    )
+    (local.set $ret (i32.load (local.get $bin_ptr)))
+
+    (if (i32.eq (i32.and (i32.const 0xFF00) (local.get $ret)) (i32.const 0xD800)) ;; surrogage pair
+        (then
+          (local.set $bits_consumed (i32.const 32))
+          ;; high 10
+          (i32.shl
+            (i32.and (i32.const 0x3ff) (local.get $ret))
+            (i32.const 10)
+          )
+          ;; low 10
+          (i32.shr_u
+            (local.get $ret)
+            (i32.const 16)
+          )
+          (i32.const 0x3ff)
+          (i32.and)
+          (i32.or)
+          (i32.const 0x1_00_00)
+          (i32.or)
+          (local.set $ret)
+        )
+        (else
+          (local.set $bits_consumed (i32.const 16))
+        )
+    )
+
+    (local.set $offset (i32.add (local.get $offset) (local.get $bits_consumed)))
+    (i32.store (i32.add (local.get $ptr) (i32.const 8)) (local.get $offset))
+
+    (i32.or
+      (i32.shl (local.get $ret) (i32.const 4))
+      (i32.const 0xF)
+    )
+  )
+
+  (export "minibeam#get_utf16_from_ctx_1" (func $bs_get_utf16))
+
+
   (func $bs_get_tail (param $ctx i32) (result i32)
     (local $ptr i32)
     (local $bin_ptr i32)

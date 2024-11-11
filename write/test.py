@@ -391,7 +391,27 @@ class Test5:
     '''
 
   def test_bs_get_utf16(self, ctx):
-    return '(unreachable)\n'
+    add_import(ctx, 'minibeam', 'get_utf16_from_ctx', 1)
+
+    [_tr, [match_ctx_reg, [_reg_type, _n]]] = self.test_args[0]
+    assert _tr == 'tr'
+    assert _reg_type == 't_bs_context'
+
+    return f'''
+      { populate_stack_with(ctx, self.test_args[0]) }
+      (call $minibeam_get_utf16_from_ctx_1)
+      (local.set $temp)
+      (if (i32.eqz (local.get $temp))
+        (then (nop))
+        (else
+          (local.get $temp)
+          { pop(ctx, *self.dreg) }
+        )
+      )
+      (i32.eqz (local.get $temp))
+      (i32.eqz)
+
+    '''
 
   def test_bs_get_binary2(self, ctx):
     add_import(ctx, 'minibeam', 'get_binary_from_ctx', 2)
