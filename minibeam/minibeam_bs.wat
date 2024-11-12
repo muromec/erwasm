@@ -704,8 +704,10 @@
       (then (return (i32.const 0)))
     )
 
-    (local.set $offset (i32.add (local.get $offset) (local.get $size)))
-    (i32.store (i32.add (local.get $ptr) (i32.const 8)) (local.get $offset))
+    ;; bc get tail should not consume the context,
+    ;; as context can be reused later. this blows up json decoder on otp 26
+    ;; (local.set $offset (i32.add (local.get $offset) (local.get $size)))
+    ;; (i32.store (i32.add (local.get $ptr) (i32.const 8)) (local.get $offset))
 
     (local.get $ret)
   )
