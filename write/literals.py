@@ -54,7 +54,7 @@ def make_word(n):
   return [len3, len2, len1, len0]
 
 def fix_string(value):
-  return  decode(value, 'unicode-escape')
+  return decode(value, 'unicode-escape')
 
 def pack_reg_value(ctx, value):
   if isinstance(value, Atom):
@@ -63,7 +63,11 @@ def pack_reg_value(ctx, value):
 
   if isinstance(value, int):
     return (value << 4 | 0xF)
- 
+
+  # This is technically UTF-32
+  if isinstance(value, str):
+    value = list(map(ord, fix_string(value)))
+
   if isinstance(value, (list, tuple, bytes)):
     (offset, _name) = add_literal(ctx, value)
     return (offset << 2 | 2)
