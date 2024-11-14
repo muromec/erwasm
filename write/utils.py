@@ -1,5 +1,6 @@
+import struct
 from erparse import Atom
-from write.literals import add_literal, GLOBAL_CONST, pack_reg_value
+from write.literals import add_literal, add_named_literal, GLOBAL_CONST, pack_reg_value, add_atom
 
 FUNC_IMPORT = '''
 (import "{mod}" "{fn}_{arity}" (func ${mod}_{fn}_{arity} {params} (result i32)))
@@ -91,7 +92,7 @@ def populate_stack_with(ctx, value):
     b += f'(i32.const {pval})\n'
   elif typ == 'atom':
     # print('v', val)
-    (atom_name, _atom_id) = ctx.register_atom(str(val))
+    (atom_name, atom_id) = add_atom(ctx, str(val))
     b += f'''
       (i32.shl
         (global.get $__unique_atom__{str(atom_name)}) ;; atom {val}\n
@@ -120,10 +121,20 @@ def arg(value):
   assert typ in ('x', 'y'), f'Wrong type {typ}'
   return typ, int(num)
 
+def add_atoms_table_literal(ctx):
+  table_list = [0] * (len(ctx.atoms) + 1)
+  table_binary = bytearray(len(table_list) * 4)
+  for (atom_id, offset) in ctx.atoms.values():
+    table_list[atom_id] = offset
 
-def get_atoms(ctx):
+  for idx, offset in enumerate(table_list):
+    struct.pack_into('<I', table_binary, idx * 4, offset)
+
+  add_named_literal(ctx, bytes(table_binary), 'unique_table_of_atoms')
+
+def write_atoms(ctx):
   b = ';; atoms table\n'
-  for (key, value) in ctx.atoms.items():
-    b += GLOBAL_CONST.format(name=f'__unique_atom__{key}', value=value)
+  for (key, (atom_id, offset)) in ctx.atoms.items():
+    b += GLOBAL_CONST.format(name=f'__unique_atom__{key}', value=atom_id, hvalue=hex(atom_id))
 
   return b

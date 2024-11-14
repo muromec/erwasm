@@ -2,7 +2,7 @@ from codecs import decode
 from erparse import Atom
 
 GLOBAL_CONST = '''
-  (global ${name} i32 (i32.const {value}))
+  (global ${name} i32 (i32.const {value})) ;; offset {hvalue}
 '''
 
 LITERAL = '''
@@ -24,27 +24,40 @@ def escape_bin(byte_list):
 
   return ret
 
-def add_literal(ctx, sval):
+def add_named_literal(ctx, sval, name=None):
   packed_value = pack_literal(ctx, sval)
+  name = name or f'{ctx.literalidx}__literal'
   ctx.data += LITERAL.format(
     offset = ctx.literalidx,
     value = escape_bin(packed_value),
   )
-  name = f'__{ctx.literalidx}__literal_ptr_raw'
   ctx.data += GLOBAL_CONST.format(
-    name = name,
+    name = f'__{name}_ptr_raw',
     value = ctx.literalidx,
+    hvalue = hex(ctx.literalidx),
   )
-  name = f'__{ctx.literalidx}__literal_ptr_e'
   ctx.data += GLOBAL_CONST.format(
-    name = name,
+    name = f'__{name}_ptr_e',
     value = (ctx.literalidx << 2) | 2,
+    hvalue = hex((ctx.literalidx << 2) | 2),
   )
   ctx.data += f';; erlang value {repr(sval)}, {type(sval)} \n'
 
   offset = ctx.literalidx + 0
   ctx.literalidx += len(packed_value)
-  return (offset, name)
+  return (offset, f'__{name}_ptr_e')
+
+def add_literal(ctx, sval):
+  return add_named_literal(ctx, sval)
+
+def add_atom(ctx, val):
+  if ctx.has_atom(str(val)):
+    (atom_name, atom_id, _offset) = ctx.resolve_atom(str(val))
+  else:
+    (offset, _name) = add_named_literal(ctx, bytes(str(val), 'utf8'), f'atom__{str(val)}')
+    (atom_name, atom_id) = ctx.register_atom(str(val), offset)
+
+  return (atom_name, atom_id)
 
 def make_word(n):
   len3 = n & 0xFF
@@ -58,7 +71,7 @@ def fix_string(value):
 
 def pack_reg_value(ctx, value):
   if isinstance(value, Atom):
-    (_atom_name, atom_id) = ctx.register_atom(str(value))
+    (_atom_name, atom_id) = add_atom(ctx, str(value))
     return (atom_id << 6 | 0xB)
 
   if isinstance(value, int):

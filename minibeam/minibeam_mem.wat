@@ -15,6 +15,7 @@
   (global $__nbuffer__literal_ptr_raw i32 (i32.const 10))
   (global $__dec_buffer__literal_ptr_raw i32 (i32.const 32))
 
+  (global $__unique_atom__utf8 i32 (i32.const 2))
 
   (global $__free_mem (mut i32) (i32.const 44))
 
@@ -877,6 +878,74 @@
     (i32.const 0x3b)
   )
   (export "minibeam#trace_enable_0" (func $trace_enable))
+
+  (func $atom_to_binary_2 (param $atom i32) (param $encoding i32) (result i32)
+    (if 
+      (i32.eq (i32.and (i32.const 0x3f) (local.get $atom)) (i32.const 0xb))
+      (then
+        (local.set $atom (i32.shr_u (local.get $atom) (i32.const 6)))
+      )
+      (else (unreachable)) ;; not an atom
+    )
+
+    (if 
+      (i32.eq (i32.and (i32.const 0x3f) (local.get $encoding)) (i32.const 0xb))
+      (then
+        (local.set $encoding (i32.shr_u (local.get $encoding) (i32.const 6)))
+      )
+      (else (unreachable)) ;; not an atom
+    )
+
+    (if
+      (i32.eq (local.get $encoding) (global.get $__unique_atom__utf8))
+      (then (nop))
+      (else (unreachable)) ;; bad encoding
+    )
+
+    (local.get $atom)
+    (global.get $__unique_table_of_atoms_ptr_raw)
+    (i32.const 4)
+    (i32.add)
+    (i32.load)
+    (i32.const 5) ;; stored size in bits, each atom is a word
+    (i32.shr_u)
+    (if
+      (i32.lt_u)
+      (then (nop))
+      (else (unreachable)) ;; item id is not in a table
+    )
+
+
+    (local.get $atom)
+    (i32.const 2)
+    (i32.add)
+
+    (i32.const 2)
+    (i32.shl)
+
+    (global.get $__unique_table_of_atoms_ptr_raw)
+    (i32.add)
+
+    (i32.load)
+    (i32.const 2)
+    (i32.shl)
+    (i32.const 2)
+    (i32.or)
+  )
+
+  (export      "erlang#atom_to_binary_2" (func $atom_to_binary_2))
+
+  (func $atom_to_binary_1 (param $atom i32) (result i32)
+    (local.get $atom)
+    (global.get $__unique_atom__utf8)
+    (i32.const 6)
+    (i32.shl)
+    (i32.const 0xB)
+    (i32.or)
+    (call $atom_to_binary_2)
+  )
+
+  (export      "erlang#atom_to_binary_1" (func $atom_to_binary_1))
 
 )
 

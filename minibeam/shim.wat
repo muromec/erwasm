@@ -33,7 +33,6 @@
   (export      "erlang#list_to_binary_1" (func $nop_1))
   (export      "erlang#iolist_to_binary_1" (func $nop_1))
   (export      "erlang#float_to_binary_2" (func $nop_2))
-  (export      "erlang#atom_to_binary_2" (func $nop_2))
   (export      "erlang#integer_to_list_1" (func $nop_1))
 
   (export      "calendar#universal_time_to_local_time_1" (func $nop_1))

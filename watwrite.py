@@ -18,7 +18,7 @@ from write.block import Label, FuncInfo, BadMatch
 from write.regs import Allocate, Trim, VariableMetaNop, Swap
 from write.proc import Send
 
-from write.utils import make_result_n, make_in_params_n, get_atoms, add_literal
+from write.utils import make_result_n, make_in_params_n, write_atoms, add_literal, add_atoms_table_literal
 
 
 MODULE = '''(module
@@ -81,14 +81,21 @@ def produce_wasm(module):
     depth = 0
 
     @classmethod
-    def register_atom(cls, atom_name):
-      if atom_name in cls.atoms:
-        atom_id = cls.atoms[atom_name]
-        return (atom_name, atom_id)
+    def has_atom(cls, atom_name):
+      return atom_name in cls.atoms
+
+    @classmethod
+    def resolve_atom(cls, atom_name):
+      (atom_id, offset) = cls.atoms[atom_name]
+      return (atom_name, atom_id, offset)
+
+    @classmethod
+    def register_atom(cls, atom_name, offset):
+      assert not (atom_name in cls.atoms), 'Already registered'
 
       cls.last_atom_id += 1
       atom_id = cls.last_atom_id
-      cls.atoms[atom_name] = atom_id
+      cls.atoms[atom_name] = (atom_id, offset)
       return (atom_name, atom_id)
 
   (Ctx.module_name_const, _ignore) = add_literal(Ctx, bytes('Trace: ' + str(module.name) + '            \n', 'latin1'))
@@ -216,9 +223,12 @@ def produce_wasm(module):
       localvars=localvars,
       body=b,
     )
+
+  add_atoms_table_literal(Ctx)
+
   data = MEM_NEXT_FREE.format(
     offset=Ctx.literalidx,
-  ) + Ctx.data + get_atoms(Ctx)
+  ) + Ctx.data + write_atoms(Ctx)
   return MODULE.format(
     name=module.name,
     imports="\n".join(Ctx.imports),
