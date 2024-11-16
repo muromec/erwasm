@@ -71,6 +71,26 @@
       (local $buf i32)
       (local $rem i32)
       (local $pos i32)
+      (local $neg i32)
+
+      (local.set $neg
+        (i32.eq
+          (i32.and (i32.const 0x08_00_00_00) (local.get $value))
+          (i32.const 0x08_00_00_00)
+        )
+      )
+
+      (if
+        (local.get $neg)
+        (then
+          (local.set $value
+            (i32.add
+              (i32.const 1)
+              (i32.xor (local.get $value) (i32.const 0x0F_FF_FF_FF))
+            )
+          )
+        )
+      )
 
       (local.set $buf
         (i32.add
@@ -105,6 +125,16 @@
         (if (i32.eqz (local.get $value))
             (then (nop))
             (else (br $loop))
+        )
+      )
+      (if
+        (local.get $neg)
+        (then
+          (local.get $buf)
+          (i32.const 0x2D)
+          (i32.store8)
+
+          (local.set $pos (i32.sub (local.get $pos) (i32.const 1)))
         )
       )
       (local.get $pos)
