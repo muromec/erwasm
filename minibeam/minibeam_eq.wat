@@ -1,5 +1,7 @@
 (module
   (import "erdump" "hexlog_1" (func $hexlog (param i32) (result i32)))
+  (import "minibeam" "is_mem_ptr_1" (func $is_mem_ptr (param i32) (result i32)))
+
   (memory 0)
 
   (func $test_eq_helper (param $ptr_a i32) (param $ptr_b i32) (result i32)
@@ -166,7 +168,7 @@
     )
 
     ;; load a if needed
-    (if (i32.eq (i32.and (local.get $value_a) (i32.const 3)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $value_a))
       (then
         (i32.shr_u (local.get $value_a) (i32.const 2))
         (i32.load)
@@ -178,7 +180,7 @@
     )
 
     ;; load b if needed
-    (if (i32.eq (i32.and (local.get $value_b) (i32.const 3)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $value_a))
       (then
         (i32.shr_u (local.get $value_b) (i32.const 2))
         (i32.load)

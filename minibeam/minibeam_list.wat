@@ -2,6 +2,8 @@
 
   (import "erdump" "alloc" (func $alloc (param i32 i32) (result i32)))
   (import "erdump" "hexlog_1" (func $hexlog (param i32) (result i32)))
+  (import "minibeam" "is_mem_ptr_1" (func $is_mem_ptr (param i32) (result i32)))
+
   (memory 0)
 
   (func $put_list (param $head i32) (param $tail i32) (result i32)
@@ -11,7 +13,7 @@
     (local $temp i32)
 
     ;; if tail is a mem pointer, load it
-    (if (i32.eq (i32.and (local.get $tail) (i32.const 3)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $tail))
       (then
         (local.set $tail_ptr (i32.shr_u (local.get $tail) (i32.const 2)))
         (i32.load (local.get $tail_ptr))
@@ -85,7 +87,7 @@
     )
 
     ;; check its a mem pointer
-    (if (i32.eq (i32.and (local.get $arg) (i32.const 3)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $arg))
       (then
         (local.get $arg)
         (i32.shr_u (i32.const 2))
@@ -170,7 +172,7 @@
     )
 
     ;; check its a mem pointer
-    (if (i32.eq (i32.and (local.get $arg) (i32.const 3)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $arg))
       (then
         (local.get $arg)
         (i32.shr_u (i32.const 2))

@@ -633,7 +633,7 @@
 	)
     )
 
-    (if (i32.eq (i32.and (local.get $in_ptr) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $in_ptr))
         (then nop)
         (else (unreachable))
     )

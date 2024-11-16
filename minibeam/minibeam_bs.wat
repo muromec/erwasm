@@ -243,7 +243,7 @@
     (i32.load (i32.add (local.get $ptr) (i32.const 4)))
     (local.set $bin_ptr)
 
-    (if (i32.eq (i32.and (local.get $bin_ptr) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $bin_ptr))
         (then nop)
         (else unreachable)
     )
