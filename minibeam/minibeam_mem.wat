@@ -275,23 +275,116 @@
   (export "minibeam#display_1" (func $display))
 
 
+  (func $display_raw (param $mem i32) (param $len i32) (result i32)
+      (local $tmp i32)
+      (if (i32.lt_u (local.get $len) (i32.const 0))
+          (then (unreachable))
+      )
+      (loop $bytes
+        (local.set
+          $tmp
+          (i32.and
+            (i32.load8_u (local.get $mem))
+            (i32.const 0x0F)
+          )
+        )
+        (if (i32.lt_u (local.get $tmp) (i32.const 10))
+          (then
+            (local.set $tmp
+               (i32.add (local.get $tmp) (i32.const 0x30))
+            )
+          )
+          (else
+            (local.set $tmp
+               (i32.add (local.get $tmp) (i32.const 0x37))
+            )
+          )
+        )
+
+        (i32.store8
+          (i32.add
+            (global.get $__buffer__literal_ptr_raw)
+            (i32.const 1)
+          )
+          (local.get $tmp)
+        )
+
+        (local.set
+          $tmp
+          (i32.shr_u
+            (i32.and
+              (i32.load8_u (local.get $mem))
+              (i32.const 0xF0)
+            )
+            (i32.const 4)
+          )
+        )
+        (if (i32.lt_u (local.get $tmp) (i32.const 10))
+          (then
+            (local.set $tmp
+               (i32.add (local.get $tmp) (i32.const 0x30))
+            )
+          )
+          (else
+            (local.set $tmp
+               (i32.add (local.get $tmp) (i32.const 0x37))
+            )
+          )
+        )
+        (i32.store8
+          (global.get $__buffer__literal_ptr_raw)
+          (local.get $tmp)
+        )
+
+        (call $log
+          (global.get $__buffer__literal_ptr_raw)
+          (i32.const 2)
+        ) (drop)
+
+        (local.set $len (i32.sub (local.get $len) (i32.const 1)))
+        (local.set $mem (i32.add (local.get $mem) (i32.const 1)))
+        (if (i32.gt_u (local.get $len) (i32.const 0))
+            (then (br $bytes))
+        )
+      )
+
+      (i32.const 0xF)
+  )
+  (export "minibeam#display_raw_2" (func $display))
+
   (func $alloc (param $align i32) (param $size i32) (result i32)
       (local $tmp i32)
       (local $ret i32)
       (local.set $ret (global.get $__free_mem))
 
-      (local.set $tmp (i32.ctz (local.get $align)))
-      (i32.shl
-        (i32.shr_u (local.get $ret) (local.get $tmp))
-        (local.get $tmp)
+      (if (i32.eq (i32.const 4) (local.get $align))
+        (then (nop))
+        (else
+          (call $hexlog (i32.const 0x111A_EE0A)) (drop)
+          (unreachable)
+        )
       )
-      (local.set $ret)
-      (local.set $ret (i32.add (local.get $ret) (local.get $align)))
-      (global.set $__free_mem (i32.add (local.get $ret) (local.get $size)))
+
+      (local.set $tmp (i32.add (local.get $ret) (local.get $size)))
+      (loop $align
+        (if (i32.eqz (i32.and (local.get $tmp) (i32.const 3)))
+          (then (nop))
+          (else
+            (local.set $tmp (i32.add (local.get $tmp) (i32.const 1)))
+            (br $align)
+          )
+        )
+      )
+      (global.set $__free_mem (local.get $tmp))
       (local.get $ret)
   )
   (export "erdump#alloc" (func $alloc))
   (export "mimibeam#alloc_2" (func $alloc))
+
+  (func $is_mem_ptr (param $ptr i32) (result i32)
+    (i32.eq (i32.and (local.get $ptr) (i32.const 0xF)) (i32.const 2))
+  )
+  (export "minibeam#is_mem_ptr_1" (func $is_mem_ptr))
 
   (func $read_erl_mem (param $erl_val i32) (param $mem_buffer i32) (result i32)
     (local $their_ptr i32)

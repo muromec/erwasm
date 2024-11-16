@@ -15,6 +15,10 @@ def pad(n):
     return '0' + n
   return n
 
+def word_align(ptr):
+  while (ptr & 3) != 0:
+    ptr += 1
+  return ptr
 
 def escape_bin(byte_list):
   ret = ''
@@ -44,7 +48,7 @@ def add_named_literal(ctx, sval, name=None):
   ctx.data += f';; erlang value {repr(sval)}, {type(sval)} \n'
 
   offset = ctx.literalidx + 0
-  ctx.literalidx += len(packed_value)
+  ctx.literalidx = word_align(len(packed_value) + ctx.literalidx)
   return (offset, f'__{name}_ptr_e')
 
 def add_literal(ctx, sval):

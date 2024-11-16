@@ -4,6 +4,7 @@
   (import "erdump" "hexlog_1" (func $hexlog (param i32) (result i32)))
   (import "erdump" "write_buf" (func $make_erl_buf (param i32 i32) (result i32)))
   (import "minibeam" "display_1" (func $display (param i32) (result i32)))
+  (import "minibeam" "is_mem_ptr_1" (func $is_mem_ptr (param i32) (result i32)))
 
   (data (i32.const 0) "\24\00\00\00\18\00\00\00\58\58\0a")
   (global $__0__literal_ptr_raw i32 (i32.const 0))
@@ -16,7 +17,7 @@
     (local $ret i32)
     (local $value i32)
 
-    (if (i32.eq (i32.and (local.get $mem) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $mem))
       (then nop)
       (else (return (i32.const 0)))
     )
@@ -67,7 +68,7 @@
     (local $temp i32)
     (local $offset i32)
 
-    (if (i32.eq (i32.and (local.get $ctx) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $ctx))
         (then nop)
         (else unreachable)
     )
@@ -87,7 +88,7 @@
     (i32.load (i32.add (local.get $ptr) (i32.const 8)))
     (local.set $offset)
 
-    (if (i32.eq (i32.and (local.get $bin_ptr) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $bin_ptr))
         (then nop)
         (else unreachable)
     )
@@ -118,7 +119,7 @@
     (local $size i32)
     (local $offset i32)
 
-    (if (i32.eq (i32.and (local.get $ctx) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $ctx))
         (then nop)
         (else unreachable)
     )
@@ -134,7 +135,7 @@
     (i32.load (i32.add (local.get $ptr) (i32.const 4)))
     (local.set $bin_ptr)
 
-    (if (i32.eq (i32.and (local.get $bin_ptr) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $bin_ptr))
         (then nop)
         (else unreachable)
     )
@@ -174,7 +175,7 @@
     (local $size i32)
     (local $offset i32)
 
-    (if (i32.eq (i32.and (local.get $ctx) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $ctx))
         (then nop)
         (else unreachable)
     )
@@ -190,7 +191,7 @@
     (i32.load (i32.add (local.get $ptr) (i32.const 4)))
     (local.set $bin_ptr)
 
-    (if (i32.eq (i32.and (local.get $bin_ptr) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $bin_ptr))
         (then nop)
         (else unreachable)
     )
@@ -226,7 +227,7 @@
     (local $size i32)
     (local $offset i32)
 
-    (if (i32.eq (i32.and (local.get $ctx) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $ctx))
         (then nop)
         (else unreachable)
     )
@@ -280,7 +281,7 @@
     (local $temp i32)
     (local $offset i32)
 
-    (if (i32.eq (i32.and (local.get $ctx) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $ctx))
         (then nop)
         (else unreachable)
     )
@@ -308,7 +309,7 @@
     (local $bin_ptr i32)
     (local $offset i32)
 
-    (if (i32.eq (i32.and (local.get $ctx) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $ctx))
         (then nop)
         (else unreachable)
     )
@@ -331,7 +332,7 @@
     (local $ptr i32)
     (local $bin_ptr i32)
 
-    (if (i32.eq (i32.and (local.get $ctx) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $ctx))
         (then nop)
         (else unreachable)
     )
@@ -357,7 +358,7 @@
     (local $offset i32)
     (local $ret i32)
 
-    (if (i32.eq (i32.and (local.get $ctx) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $ctx))
         (then nop)
         (else unreachable)
     )
@@ -387,7 +388,7 @@
     (i32.load (i32.add (local.get $ptr) (i32.const 4)))
     (local.set $bin_ptr)
 
-    (if (i32.eq (i32.and (local.get $bin_ptr) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $bin_ptr))
         (then nop)
         (else unreachable)
     )
@@ -442,7 +443,7 @@
     (local $ret i32)
     (local $bits_consumed i32)
 
-    (if (i32.eq (i32.and (local.get $ctx) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $ctx))
         (then nop)
         (else (return (i32.const 0)))
     )
@@ -458,7 +459,7 @@
     (i32.load (i32.add (local.get $ptr) (i32.const 4)))
     (local.set $bin_ptr)
 
-    (if (i32.eq (i32.and (local.get $bin_ptr) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $bin_ptr))
         (then nop)
         (else unreachable)
     )
@@ -565,7 +566,7 @@
     (local $ret i32)
     (local $bits_consumed i32)
 
-    (if (i32.eq (i32.and (local.get $ctx) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $ctx))
         (then nop)
         (else (return (i32.const 0)))
     )
@@ -581,7 +582,7 @@
     (i32.load (i32.add (local.get $ptr) (i32.const 4)))
     (local.set $bin_ptr)
 
-    (if (i32.eq (i32.and (local.get $bin_ptr) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $bin_ptr))
         (then nop)
         (else unreachable)
     )
@@ -648,7 +649,7 @@
     (local $offset i32)
     (local $ret i32)
 
-    (if (i32.eq (i32.and (local.get $ctx) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $ctx))
         (then nop)
         (else unreachable)
     )
@@ -664,7 +665,7 @@
     (i32.load (i32.add (local.get $ptr) (i32.const 4)))
     (local.set $bin_ptr)
 
-    (if (i32.eq (i32.and (local.get $bin_ptr) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $bin_ptr))
         (then nop)
         (else unreachable)
     )
@@ -740,7 +741,7 @@
   (func $get_bit_size (param $mem i32) (result i32)
     (local $ptr i32)
 
-    (if (i32.eq (i32.and (local.get $mem) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $mem))
         (then nop)
         (else unreachable)
     )
@@ -823,7 +824,7 @@
     )
     (local.set $len (i32.shr_u (local.get $len) (i32.const 4)))
 
-    (if (i32.eq (i32.and (local.get $mem) (i32.const 2)) (i32.const 2))
+    (if (call $is_mem_ptr (local.get $mem))
         (then nop)
         (else unreachable)
     )
