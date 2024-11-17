@@ -17,6 +17,7 @@ from write.bif import GcBif, Bif
 from write.block import Label, FuncInfo, BadMatch
 from write.regs import Allocate, Trim, VariableMetaNop, Swap
 from write.proc import Send
+from write.exception import Try, TryEnd, TryCase, TryCaseEnd
 
 from write.utils import make_result_n, make_in_params_n, write_atoms, add_literal, add_atoms_table_literal
 
@@ -30,6 +31,7 @@ MODULE = '''(module
 
    (global $__unique__trace_enable (mut i32) (i32.const 0))
    (global $__trace_enable (mut i32)  (i32.const 0))
+   (global $__unique_exception (mut i32) (i32.const 0))
 
    {data}
    ;; module body
@@ -129,6 +131,26 @@ def produce_wasm(module):
     labels0 = list(map(str,range(0, len(labels))))
     labels0 = " ".join(labels0[:])
     b += f'(loop $start\n'
+    b += f'''
+    (if
+      (global.get $__unique_exception)
+      (then
+        (if
+         (i32.load
+          (i32.add (global.get $__unique_exception) (i32.const 4))
+         )
+         (then
+           (if (local.get $exception_h)
+             (then
+              (local.set $jump (local.get $exception_h))
+             )
+             (else (return (i32.const 0xFF_FF_FF_00)))
+           )
+         )
+        )
+      )
+    )
+    '''
     while labels:
       label = labels.pop()
       b += f'(block $label_{label} \n'
@@ -183,6 +205,11 @@ def produce_wasm(module):
         'call_ext_only': ExternalCallDrop,
         'call_ext_last': ExternalCallTail,
 
+        'try': Try,
+        'try_end': TryEnd,
+        'try_case': TryCase,
+        'try_case_end': TryCaseEnd,
+
         'gc_bif': GcBif,
         'bif': Bif,
 
@@ -213,6 +240,7 @@ def produce_wasm(module):
 
     localvars += f'(local $temp i32)\n'
     localvars += f'(local $jump i32)\n'
+    localvars += f'(local $exception_h i32)\n'
 
     body += FUNC.format(
       name=sanitize_func(func.name),

@@ -29,7 +29,14 @@ class LocalCall:
     assert not (into_func is None)
     ctx.max_xregs = max(ctx.max_xregs, self.arity)
 
-    return f'call ${into_func.name}_{into_func.arity}\n'
+    return f'''
+      (call ${into_func.name}_{into_func.arity})
+      (local.set $temp)
+      (if (i32.eq (local.get $temp) (i32.const 0xFF_FF_FF_00))
+          (then (br $start))
+      )
+      (local.get $temp)
+    '''
 
   def to_wat(self, ctx):
     return self.populate_args(ctx) + self.make_call(ctx) + self.populate_ret(ctx)
@@ -63,7 +70,15 @@ class ExternalCall(LocalCall):
     add_import(ctx, self.ext_mod, self.ext_fn, self.arity)
     ctx.max_xregs = max(ctx.max_xregs, self.arity)
 
-    return f'call ${self.ext_mod}_{self.ext_fn}_{self.arity}\n'
+    return f'''
+      (call ${self.ext_mod}_{self.ext_fn}_{self.arity})
+      (local.set $temp)
+      (if (i32.eq (local.get $temp) (i32.const 0xFF_FF_FF_00))
+          (then (br $start))
+      )
+      (local.get $temp)
+    '''
+
 
 class ExternalCallDrop(ExternalCall):
   def to_wat(self, ctx):

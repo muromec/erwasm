@@ -1,6 +1,7 @@
 (module
   (import "wasi:cli/stdout@0.2.0" "get-stdout" (func $get_stdout (result i32)))
   (import "wasi:io/streams@0.2.0" "[method]output-stream.blocking-write-and-flush" (func $output_stream_write_flush (param i32 i32 i32 i32)))
+  (import "minibeam" "tuple_alloc_1" (func $tuple_alloc (param i32) (result i32)))
 
   (memory 0)
   (data (i32.const 0) "") ;; 4
@@ -16,6 +17,10 @@
   (global $__dec_buffer__literal_ptr_raw i32 (i32.const 32))
 
   (global $__unique_atom__utf8 i32 (i32.const 2))
+  (global $__unique_atom__throw i32 (i32.const 3))
+
+  (global $__unique_exception (mut i32) (i32.const 0))
+  (export "__exception" (global $__unique_exception))
 
   (global $__free_mem (mut i32) (i32.const 44))
 
@@ -1069,6 +1074,43 @@
   )
 
   (export      "erlang#atom_to_binary_1" (func $atom_to_binary_1))
+
+  (func $er_throw_2 (param $typ i32) (param $reason i32) (result i32)
+    (if ;; no try catch handler all the way up to the root
+      (i32.eqz (global.get $__unique_exception))
+      (then
+        (call $tuple_alloc (i32.const 2))
+        (global.set $__unique_exception)
+      )
+    )
+
+    (i32.store
+      (i32.add (global.get $__unique_exception) (i32.const 4))
+      (local.get $typ)
+    )
+
+    (i32.store
+      (i32.add (global.get $__unique_exception) (i32.const 8))
+      (local.get $reason)
+    )
+
+    (i32.const 0xFF_FF_FF_00)
+  )
+  (export      "erlang#throw_2" (func $er_throw_2))
+
+  (func $er_throw_1 (param $reason i32) (result i32)
+    (call $er_throw_2
+      (i32.or
+        (i32.shl
+          (global.get $__unique_atom__throw)
+          (i32.const 6)
+        )
+        (i32.const 0xB)
+      )
+      (local.get $reason)
+    )
+   )
+  (export      "erlang#throw_1" (func $er_throw_1))
 
 )
 
