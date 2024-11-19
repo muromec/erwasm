@@ -138,3 +138,26 @@ def write_atoms(ctx):
     b += GLOBAL_CONST.format(name=f'__unique_atom__{key}', value=atom_id, hvalue=hex(atom_id))
 
   return b
+
+
+def write_exception_handlers(ctx, mod_name, func_name):
+  add_import(ctx, 'minibeam', 'add_trace', 3)
+
+  return f'''
+    (if
+     (i32.load (global.get $__unique_exception__literal_ptr_raw))
+     (then
+       (global.get $__unique_atom__{mod_name})
+       (global.get $__unique_atom__{func_name})
+       (local.get $line)
+       (call $minibeam_add_trace_3) (drop)
+
+       (if (local.get $exception_h)
+         (then
+          (local.set $jump (local.get $exception_h))
+         )
+         (else (return (i32.const 0xFF_FF_FF_00)))
+       )
+     )
+    )
+    '''

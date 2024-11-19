@@ -9,8 +9,9 @@
   (data (i32.const 8)  "0x00000000\n") ;; 18
   (data (i32.const 32) "00000000000\00\00") ;; 44
   (data (i32.const 44) "\00\00\00\00\00\00\00\00\00\00\00\00") ;; 60
+  (data (i32.const 60) "\00\00\00\00\00\00\00\00") ;; 200 traceback buffer
+  (data (i32.const 188) "\FF\FF\FF\FF\FF\FF\FF\FF") ;; Traceback end
 
-  (global $__unique__trace_enable (mut i32) (i32.const 0) (mut i32) (i32.const 0))
   (global $__ret__literal_ptr_raw i32 (i32.const 0))
   (global $__hi__literal_ptr_raw i32 (i32.const 4))
   (global $__buffer__literal_ptr_raw i32 (i32.const 8))
@@ -22,8 +23,11 @@
 
   (global $__unique_exception__literal_ptr_raw (mut i32) (i32.const 44))
   (export "__exception" (global $__unique_exception__literal_ptr_raw))
+  (global $__tb__literal_ptr_raw i32 (i32.const 60))
+  (global $__tb_head__literal_ptr_raw (mut i32) (i32.const 60))
+  (export "__tb__literal" (global $__tb_head__literal_ptr_raw))
 
-  (global $__free_mem (mut i32) (i32.const 60))
+  (global $__free_mem (mut i32) (i32.const 200))
 
   (func $write_flush (param $stream i32) (param $ptr i32) (param $len i32) (result i32)
       ;; pass four args to write method
@@ -421,6 +425,32 @@
     (i32.eq (i32.and (local.get $ptr) (i32.const 0xF)) (i32.const 2))
   )
   (export "minibeam#is_mem_ptr_1" (func $is_mem_ptr))
+
+  (func $log_buffer (param $buffer i32) (result i32)
+    (local $len i32)
+    ;; 0b10 is mem pointer
+    (if (i32.eq (i32.const 0x2) (i32.and (i32.const 0x3) (local.get $buffer)))
+      (then
+        (local.set $buffer (i32.shr_u (local.get $buffer) (i32.const 2)))
+      )
+      (else
+        (unreachable)
+      )
+    )
+    (if (i32.eq (i32.const 0x24) (i32.and (i32.const 0x3F) (i32.load (local.get $buffer))))
+      (then
+        (i32.load (i32.add (local.get $buffer) (i32.const 4)))
+        (i32.const 3)
+        (i32.shr_u)
+        (local.set $len)
+      )
+      (else
+        (unreachable)
+      )
+    )
+    (call $log (i32.add (local.get $buffer) (i32.const 8)) (local.get $len)) (drop)
+    (i32.const 0)
+  )
 
   (func $read_erl_mem (param $erl_val i32) (param $mem_buffer i32) (result i32)
     (local $their_ptr i32)
@@ -980,34 +1010,6 @@
 
   (export "minibeam#into_buf_utf16_3" (func $copy_into_buf_utf16))
 
-  (func $trace (param $name_buf i32) (param $line_erl i32) (param $enable i32) (result i32)
-    (if
-       (i32.or
-         (global.get $__unique__trace_enable)
-         (local.get $enable)
-       )
-       (then
-         (i32.store
-           (i32.add
-	     (local.get $name_buf)
-             (i32.const 28)
-           )
-	   (local.get $line_erl)
-         )
-         (call $display
-	    (i32.or (i32.shl (local.get $name_buf) (i32.const 2)) (i32.const 2))
-	 ) (drop)
-       )
-    )
-    (i32.const 0x3b)
-  )
-  (export "minibeam#trace_3" (func $trace))
-  (func $trace_enable (result i32)
-    (global.set $__unique__trace_enable (i32.const 1))
-    (i32.const 0x3b)
-  )
-  (export "minibeam#trace_enable_0" (func $trace_enable))
-
   (func $atom_to_binary_2 (param $atom i32) (param $encoding i32) (result i32)
     (if 
       (i32.eq (i32.and (i32.const 0x3f) (local.get $atom)) (i32.const 0xb))
@@ -1109,6 +1111,111 @@
     )
    )
   (export      "erlang#throw_1" (func $er_throw_1))
+
+  (func $add_trace (param $mod_atom i32) (param $func_atom i32) (param $line_raw i32) (result i32)
+    (global.get $__tb_head__literal_ptr_raw)
+    (i32.load)
+    ;; got to the end of the rope
+    (if (i32.eqz) (then (nop)) (else (return (i32.const 0))))
+
+    (global.get $__tb_head__literal_ptr_raw)
+    (local.get $mod_atom)
+    (i32.store)
+
+    (global.get $__tb_head__literal_ptr_raw)
+    (i32.const 4)
+    (i32.add)
+    (local.get $func_atom)
+    (i32.store)
+
+    (global.get $__tb_head__literal_ptr_raw)
+    (i32.const 8)
+    (i32.add)
+    (local.get $line_raw)
+    (i32.store)
+
+    (global.get $__tb_head__literal_ptr_raw)
+    (i32.const 12)
+    (i32.add)
+    (i32.const 0)
+    (i32.store)
+
+    (global.get $__tb_head__literal_ptr_raw)
+    (i32.const 12)
+    (i32.add)
+    (global.set $__tb_head__literal_ptr_raw)
+    (i32.const 0)
+
+  )
+  (export      "minibeam#add_trace_3", (func $add_trace))
+
+  (func $print_trace (result i32)
+    (local $mem i32)
+    (local.set $mem (global.get $__tb__literal_ptr_raw))
+
+    (block $break
+    (loop $deep
+      (if
+        (i32.ge_u (local.get $mem) (global.get $__tb_head__literal_ptr_raw))
+        (then (br $break))
+      )
+
+      (local.get $mem)
+      (i32.load)
+      (i32.const 6)
+      (i32.shl)
+      (i32.const 0xB)
+      (i32.or)
+      (call $atom_to_binary_1)
+      (call $log_buffer) (drop)
+
+      (local.get $mem)
+      (i32.const 4)
+      (i32.add)
+      (i32.load)
+      (i32.const 6)
+      (i32.shl)
+      (i32.const 0xB)
+      (i32.or)
+      (call $atom_to_binary_1)
+      (call $log_buffer) (drop)
+
+      (local.get $mem)
+      (i32.const 8)
+      (i32.add)
+      (i32.load)
+      (i32.const 4)
+      (i32.shl)
+      (i32.const 0xF)
+      (i32.or)
+      (call $serialize_int)
+      (call $log_buffer) (drop)
+
+      (local.get $mem)
+      (i32.const 12)
+      (i32.add)
+      (local.set $mem)
+      (br $deep)
+    )
+    )
+    (call $clear_trace) (drop)
+
+    (i32.const 0)
+  )
+  (export      "minibeam#print_trace_0", (func $print_trace))
+
+  (func $clear_trace (result i32)
+    (global.set $__tb_head__literal_ptr_raw
+      (global.get $__tb__literal_ptr_raw)
+    )
+
+    (global.get $__tb_head__literal_ptr_raw)
+    (i32.const 0)
+    (i32.store)
+
+    (i32.const 0)
+  )
+  (export      "minibeam#clear_trace_0", (func $clear_trace))
 
 )
 

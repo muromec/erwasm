@@ -110,11 +110,17 @@ class Bif:
     return b
 
   def bif_raise(self, ctx):
-    add_import(ctx, 'erdump', 'hexlog', 1)
+    add_import(ctx, 'erlang', 'throw', 2)
 
-    return ''';; raise
-        (call $erdump_hexlog_1 (i32.const 0xFEED_0000)) (drop)
-        (unreachable)
+    ex_typ =  self.darg
+    [_ex_trace, ex_val] = self.sargs
+
+    push_typ = push(ctx, *ex_typ)
+    push_val = push(ctx, *arg(ex_val))
+
+    return f'''
+      (call $erlang_throw_2 {push_typ} {push_val}) (drop)
+      (br $start)
     '''
   def bif_element(self, ctx):
     jump_depth = ctx.labels_to_idx.index(self.fnumber) if self.fnumber else None
@@ -122,8 +128,6 @@ class Bif:
         (local.set $jump (i32.const {jump_depth}));; to label {self.fnumber}\n'
         (br $start)
     ''' if jump_depth else '(unreachable)'
-
-    add_import(ctx, 'erdump', 'hexlog', 1)
 
     [num, subj] = self.sargs
     load_n = populate_stack_with(ctx, num)

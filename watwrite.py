@@ -19,7 +19,7 @@ from write.regs import Allocate, Trim, VariableMetaNop, Swap
 from write.proc import Send
 from write.exception import Try, TryEnd, TryCase, TryCaseEnd
 
-from write.utils import make_result_n, make_in_params_n, write_atoms, add_literal, add_atoms_table_literal
+from write.utils import make_result_n, make_in_params_n, write_atoms, add_literal, add_atoms_table_literal, write_exception_handlers, add_atom
 
 
 MODULE = '''(module
@@ -28,9 +28,6 @@ MODULE = '''(module
    (memory 1)
    (export "memory" (memory 0))
    ;; data section
-
-   (global $__unique__trace_enable (mut i32) (i32.const 0))
-   (global $__trace_enable (mut i32)  (i32.const 0))
 
    {data}
    ;; module body
@@ -99,9 +96,10 @@ def produce_wasm(module):
       cls.atoms[atom_name] = (atom_id, offset)
       return (atom_name, atom_id)
 
-  (Ctx.module_name_const, _ignore) = add_literal(Ctx, bytes('Trace: ' + str(module.name) + '            \n', 'latin1'))
+  add_atom(Ctx, 'throw')
 
   for func in module.functions:
+    add_atom(Ctx, str(func.name))
     Ctx.max_xregs = max(int(func.arity), 1)
     Ctx.max_yregs = 0
     if (func.name, func.arity) in module.export_funcs:
@@ -130,19 +128,7 @@ def produce_wasm(module):
     labels0 = list(map(str,range(0, len(labels))))
     labels0 = " ".join(labels0[:])
     b += f'(loop $start\n'
-    b += f'''
-    (if
-     (i32.load (global.get $__unique_exception__literal_ptr_raw))
-     (then
-       (if (local.get $exception_h)
-         (then
-          (local.set $jump (local.get $exception_h))
-         )
-         (else (return (i32.const 0xFF_FF_FF_00)))
-       )
-     )
-    )
-    '''
+    b += write_exception_handlers(Ctx, module.name, func.name)
     while labels:
       label = labels.pop()
       b += f'(block $label_{label} \n'
@@ -233,6 +219,7 @@ def produce_wasm(module):
     localvars += f'(local $temp i32)\n'
     localvars += f'(local $jump i32)\n'
     localvars += f'(local $exception_h i32)\n'
+    localvars += f'(local $line i32)\n'
 
     body += FUNC.format(
       name=sanitize_func(func.name),

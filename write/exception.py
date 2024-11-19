@@ -52,6 +52,8 @@ class TryEnd:
       (i32.const 0)
       {pop_ex}
 
+      (call $minibeam_clear_trace_0) (drop)
+
       (i32.load
         (i32.add
           (global.get $__unique_exception__literal_ptr_raw)
@@ -93,6 +95,7 @@ class TryCase:
 
   def to_wat(self, ctx):
     push_ex = push(ctx, *self.exreg)
+    add_import(ctx, 'minibeam', 'clear_trace', 0)
 
     return f'''
         ;; start of exception handlers try_case
@@ -105,6 +108,10 @@ class TryCase:
         (i32.add)
         (i32.load) ;; load first el
         {pop(ctx, 'x', 1)}
+
+        ;; TODO: copy trace back before clearing
+        ;; and put mem ref into X 2
+        (call $minibeam_clear_trace_0) (drop)
 
         ;; clear exception info
         (i32.load
