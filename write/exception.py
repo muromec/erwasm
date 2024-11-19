@@ -14,16 +14,26 @@ class Try:
     jump_depth = ctx.labels_to_idx.index(jump)
     assert not (jump_depth is None)
 
-    add_import(ctx, 'minibeam', 'tuple_alloc', 1)
+    add_import(ctx, 'minibeam', 'alloc', 2)
 
     pop_ex = pop(ctx, *self.exreg)
 
     return f'''
       ;; start try catch block
-      (call $minibeam_tuple_alloc_1 (i32.const 2))
-      (global.set $__unique_exception)
+      (global.get $__unique_exception__literal_ptr_raw)
+      (local.set $temp)
+      (call $minibeam_alloc_2 (i32.const 4) (i32.const 16))
+      (global.set $__unique_exception__literal_ptr_raw)
 
-      (global.get $__unique_exception)
+      (i32.store
+        (i32.add
+          (global.get $__unique_exception__literal_ptr_raw)
+          (i32.const 8)
+        )
+        (local.get $temp)
+      )
+
+      (global.get $__unique_exception__literal_ptr_raw)
       {pop_ex}
 
       (local.set $exception_h (i32.const {jump_depth}));; handler is at {jump}
@@ -41,7 +51,37 @@ class TryEnd:
       ;; end of the section covered by critical handler
       (i32.const 0)
       {pop_ex}
-      (global.set $__unique_exception (i32.const 0))
+
+      (i32.load
+        (i32.add
+          (global.get $__unique_exception__literal_ptr_raw)
+          (i32.const 8)
+        )
+      )
+      (local.set $temp)
+
+      (i32.store
+        (global.get $__unique_exception__literal_ptr_raw)
+        (i32.const 0)
+      )
+
+      (i32.store
+        (i32.add
+          (global.get $__unique_exception__literal_ptr_raw)
+          (i32.const 4)
+        )
+        (i32.const 0)
+      )
+
+      (i32.store
+        (i32.add
+          (global.get $__unique_exception__literal_ptr_raw)
+          (i32.const 8)
+        )
+        (i32.const 0)
+      )
+      (global.set $__unique_exception__literal_ptr_raw (local.get $temp))
+
       (local.set $exception_h (i32.const 0))
     '''
 
@@ -56,33 +96,48 @@ class TryCase:
 
     return f'''
         ;; start of exception handlers try_case
-        (global.set $__unique_exception (i32.const 0))
-        (local.set $exception_h (i32.const 0))
-
         { push_ex } ;; exc reg has raw mem pointer in it
-        (i32.load) ;; read tuple from offset
-        (i32.and (i32.const 0x3f))
+        (i32.load) ;; load first el
+        {pop(ctx, 'x', 0)}
 
-        (if
-          (i32.eqz) ;; is tuple
-          (then
-            {push_ex}
-            (i32.const 4) ;; first element is exc type
-            (i32.add)
-            (i32.load) ;; load first el
-            {pop(ctx, 'x', 0)}
+        {push_ex}
+        (i32.const 4) ;; second element is exc reason
+        (i32.add)
+        (i32.load) ;; load first el
+        {pop(ctx, 'x', 1)}
 
-            {push_ex}
-            (i32.const 8) ;; second element is exc reason
-            (i32.add)
-            (i32.load) ;; load first el
-            {pop(ctx, 'x', 1)}
-          )
-          (else ;; not a tuple
-            (unreachable)
+        ;; clear exception info
+        (i32.load
+          (i32.add
+            (global.get $__unique_exception__literal_ptr_raw)
+            (i32.const 8)
           )
         )
+        (local.set $temp)
 
+        (i32.store
+          (global.get $__unique_exception__literal_ptr_raw)
+          (i32.const 0)
+        )
+
+        (i32.store
+          (i32.add
+            (global.get $__unique_exception__literal_ptr_raw)
+            (i32.const 4)
+          )
+          (i32.const 0)
+        )
+
+        (i32.store
+          (i32.add
+            (global.get $__unique_exception__literal_ptr_raw)
+            (i32.const 8)
+          )
+          (i32.const 0)
+        )
+        (global.set $__unique_exception__literal_ptr_raw (local.get $temp))
+
+      (local.set $exception_h (i32.const 0))
         ;; end of reading exception info
       '''
 

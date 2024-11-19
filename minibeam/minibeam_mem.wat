@@ -8,6 +8,7 @@
   (data (i32.const 4) "Hi\n") ;; 3
   (data (i32.const 8)  "0x00000000\n") ;; 18
   (data (i32.const 32) "00000000000\00\00") ;; 44
+  (data (i32.const 44) "\00\00\00\00\00\00\00\00\00\00\00\00") ;; 60
 
   (global $__unique__trace_enable (mut i32) (i32.const 0) (mut i32) (i32.const 0))
   (global $__ret__literal_ptr_raw i32 (i32.const 0))
@@ -19,10 +20,10 @@
   (global $__unique_atom__utf8 i32 (i32.const 2))
   (global $__unique_atom__throw i32 (i32.const 3))
 
-  (global $__unique_exception (mut i32) (i32.const 0))
-  (export "__exception" (global $__unique_exception))
+  (global $__unique_exception__literal_ptr_raw (mut i32) (i32.const 44))
+  (export "__exception" (global $__unique_exception__literal_ptr_raw))
 
-  (global $__free_mem (mut i32) (i32.const 44))
+  (global $__free_mem (mut i32) (i32.const 60))
 
   (func $write_flush (param $stream i32) (param $ptr i32) (param $len i32) (result i32)
       ;; pass four args to write method
@@ -414,7 +415,7 @@
       (local.get $ret)
   )
   (export "erdump#alloc" (func $alloc))
-  (export "mimibeam#alloc_2" (func $alloc))
+  (export "minibeam#alloc_2" (func $alloc))
 
   (func $is_mem_ptr (param $ptr i32) (result i32)
     (i32.eq (i32.and (local.get $ptr) (i32.const 0xF)) (i32.const 2))
@@ -1077,20 +1078,17 @@
 
   (func $er_throw_2 (param $typ i32) (param $reason i32) (result i32)
     (if ;; no try catch handler all the way up to the root
-      (i32.eqz (global.get $__unique_exception))
-      (then
-        (call $tuple_alloc (i32.const 2))
-        (global.set $__unique_exception)
-      )
+      (i32.eqz (global.get $__unique_exception__literal_ptr_raw))
+      (then (unreachable))
     )
 
     (i32.store
-      (i32.add (global.get $__unique_exception) (i32.const 4))
+      (global.get $__unique_exception__literal_ptr_raw)
       (local.get $typ)
     )
 
     (i32.store
-      (i32.add (global.get $__unique_exception) (i32.const 8))
+      (i32.add (global.get $__unique_exception__literal_ptr_raw) (i32.const 4))
       (local.get $reason)
     )
 

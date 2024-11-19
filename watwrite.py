@@ -31,7 +31,6 @@ MODULE = '''(module
 
    (global $__unique__trace_enable (mut i32) (i32.const 0))
    (global $__trace_enable (mut i32)  (i32.const 0))
-   (global $__unique_exception (mut i32) (i32.const 0))
 
    {data}
    ;; module body
@@ -133,22 +132,15 @@ def produce_wasm(module):
     b += f'(loop $start\n'
     b += f'''
     (if
-      (global.get $__unique_exception)
-      (then
-        (if
-         (i32.load
-          (i32.add (global.get $__unique_exception) (i32.const 4))
-         )
+     (i32.load (global.get $__unique_exception__literal_ptr_raw))
+     (then
+       (if (local.get $exception_h)
          (then
-           (if (local.get $exception_h)
-             (then
-              (local.set $jump (local.get $exception_h))
-             )
-             (else (return (i32.const 0xFF_FF_FF_00)))
-           )
+          (local.set $jump (local.get $exception_h))
          )
-        )
-      )
+         (else (return (i32.const 0xFF_FF_FF_00)))
+       )
+     )
     )
     '''
     while labels:

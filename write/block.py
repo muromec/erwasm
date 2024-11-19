@@ -25,7 +25,6 @@ class BadMatch:
     self.reason = reason
 
   def to_wat(self, ctx):
-    add_import(ctx, 'erdump', 'hexlog', 1)
     add_import(ctx, 'erlang', 'throw', 2)
     add_import(ctx, 'minibeam', 'tuple_alloc', 1)
 
