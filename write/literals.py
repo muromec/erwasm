@@ -29,6 +29,7 @@ def escape_bin(byte_list):
   return ret
 
 def add_named_literal(ctx, sval, name=None):
+  from .utils import sanitize_atom
   packed_value = pack_literal(ctx, sval)
   name = name or f'{ctx.literalidx}__literal'
   ctx.data += LITERAL.format(
@@ -36,12 +37,12 @@ def add_named_literal(ctx, sval, name=None):
     value = escape_bin(packed_value),
   )
   ctx.data += GLOBAL_CONST.format(
-    name = f'__{name}_ptr_raw',
+    name = f'__{sanitize_atom(name)}_ptr_raw',
     value = ctx.literalidx,
     hvalue = hex(ctx.literalidx),
   )
   ctx.data += GLOBAL_CONST.format(
-    name = f'__{name}_ptr_e',
+    name = f'__{sanitize_atom(name)}_ptr_e',
     value = (ctx.literalidx << 2) | 2,
     hvalue = hex((ctx.literalidx << 2) | 2),
   )

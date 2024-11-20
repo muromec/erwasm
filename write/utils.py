@@ -30,7 +30,8 @@ def make_in_params_n(n):
 
 def add_import(ctx, ext_mod, ext_fn, ext_fn_arity):
   import_line = FUNC_IMPORT.format(
-    mod=ext_mod, fn=ext_fn,
+    mod=sanitize_atom(ext_mod),
+    fn=sanitize_atom(ext_fn),
     arity=int(ext_fn_arity),
     params = make_params_n(int(ext_fn_arity)),
   )
@@ -95,7 +96,7 @@ def populate_stack_with(ctx, value):
     (atom_name, atom_id) = add_atom(ctx, str(val))
     b += f'''
       (i32.shl
-        (global.get $__unique_atom__{str(atom_name)}) ;; atom {val}\n
+        (global.get $__unique_atom__{str(sanitize_atom(atom_name))}) ;; atom {val}\n
         (i32.const 6)
       )
       (i32.or (i32.const 0xB))
@@ -135,7 +136,7 @@ def add_atoms_table_literal(ctx):
 def write_atoms(ctx):
   b = ';; atoms table\n'
   for (key, (atom_id, offset)) in ctx.atoms.items():
-    b += GLOBAL_CONST.format(name=f'__unique_atom__{key}', value=atom_id, hvalue=hex(atom_id))
+    b += GLOBAL_CONST.format(name=f'__unique_atom__{sanitize_atom(key)}', value=atom_id, hvalue=hex(atom_id))
 
   return b
 
@@ -147,8 +148,8 @@ def write_exception_handlers(ctx, mod_name, func_name):
     (if
      (i32.load (global.get $__unique_exception__literal_ptr_raw))
      (then
-       (global.get $__unique_atom__{mod_name})
-       (global.get $__unique_atom__{func_name})
+       (global.get $__unique_atom__{sanitize_atom(mod_name)})
+       (global.get $__unique_atom__{sanitize_atom(func_name)})
        (local.get $line)
        (call $minibeam_add_trace_3) (drop)
 
@@ -161,3 +162,8 @@ def write_exception_handlers(ctx, mod_name, func_name):
      )
     )
     '''
+
+def sanitize_atom(name):
+  name = name.replace('-', '__beam_min__').replace('/', '__beam_slash__')
+  return name.replace('.', '__').lower()
+

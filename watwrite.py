@@ -19,7 +19,7 @@ from write.regs import Allocate, Trim, VariableMetaNop, Swap
 from write.proc import Send
 from write.exception import Try, TryEnd, TryCase, TryCaseEnd
 
-from write.utils import make_result_n, make_in_params_n, write_atoms, add_literal, add_atoms_table_literal, write_exception_handlers, add_atom
+from write.utils import make_result_n, make_in_params_n, write_atoms, add_literal, add_atoms_table_literal, write_exception_handlers, add_atom, sanitize_atom
 
 
 MODULE = '''(module
@@ -51,12 +51,6 @@ MEM_NEXT_FREE = '''
   ;; next free memory offset
   (global $__free_mem i32 (i32.const {offset}))
 '''
-
-def sanitize_func(name):
-  if name.startswith('-object'):
-    name = name.replace('-', '__beam_min__').replace('/', '__beam_slash__')
-
-  return name
 
 def produce_wasm(module):
   body = ''
@@ -222,7 +216,7 @@ def produce_wasm(module):
     localvars += f'(local $line i32)\n'
 
     body += FUNC.format(
-      name=sanitize_func(func.name),
+      name=sanitize_atom(func.name),
       arity=func.arity,
       start_label=func.start_label,
       params=make_in_params_n(int(func.arity)),

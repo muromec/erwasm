@@ -1,4 +1,4 @@
-from write.utils import push, pop, add_import, ignore_call
+from write.utils import push, pop, add_import, ignore_call, sanitize_atom
 
 def arg(value):
   [typ, [num]] = value
@@ -30,7 +30,7 @@ class LocalCall:
     ctx.max_xregs = max(ctx.max_xregs, self.arity)
 
     return f'''
-      (call ${into_func.name}_{into_func.arity})
+      (call ${sanitize_atom(into_func.name)}_{into_func.arity})
       (local.set $temp)
       (if (i32.eq (local.get $temp) (i32.const 0xFF_FF_FF_00))
           (then (br $start))
@@ -71,7 +71,7 @@ class ExternalCall(LocalCall):
     ctx.max_xregs = max(ctx.max_xregs, self.arity)
 
     return f'''
-      (call ${self.ext_mod}_{self.ext_fn}_{self.arity})
+      (call ${sanitize_atom(self.ext_mod)}_{sanitize_atom(self.ext_fn)}_{self.arity})
       (local.set $temp)
       (if (i32.eq (local.get $temp) (i32.const 0xFF_FF_FF_00))
           (then (br $start))

@@ -21,6 +21,7 @@ def parse_list_sentence_helper(text, State, end_token, depth):
   acc = ''
   acc_key = None
   acc_bytes_str = None
+  acc_bytes_codes = None
   while State.idx < len(text):
     had_state = state or had_state
     symbol = text[State.idx]
@@ -41,6 +42,7 @@ def parse_list_sentence_helper(text, State, end_token, depth):
     elif state == 'open_bytes' and symbol == '<':
       state = 'bytes'
       acc = b''
+      acc_bytes_codes = ''
     elif state == 'bytes' and symbol == '>':
       state = 'close_bytes'
       ret.append(acc)
@@ -59,9 +61,13 @@ def parse_list_sentence_helper(text, State, end_token, depth):
     elif state == 'bytes' and symbol == '"':
       state = 'bytes_str'
       acc_bytes_str = b''
+    elif state == 'bytes' and is_num(symbol):
+      acc_bytes_codes += symbol
+    elif state == 'bytes' and symbol == ',':
+      acc += bytes([int(acc_bytes_codes, 10)])
+      acc_bytes_codes = ''
     elif state == 'bytes':
       assert False
-      acc += symbol
     elif state == None and is_num(symbol):
       state = 'num'
       acc = symbol
@@ -79,10 +85,10 @@ def parse_list_sentence_helper(text, State, end_token, depth):
       ret.append(Atom(acc))
       acc = None
       state = None
-    elif state == None and symbol == '\'':
+    elif state == None and symbol == "'":
       state = 'atom_quote'
       acc = ''
-    elif state == 'atom_quote' and symbol == '\'':
+    elif state == 'atom_quote' and symbol == "'":
       ret.append(Atom(acc))
       acc = None
       state = None
@@ -193,6 +199,19 @@ def parse_beam(text):
       state = None
       ret.append(sentence)
       sentence = None
+    elif state == 'inside' and symbol == '\'':
+      state = 'inside_atom'
+      sentence += symbol
+    elif state == 'inside_atom' and symbol == '\\':
+      state = 'inside_atom_esc'
+    elif state == 'inside_atom_esc':
+      state = 'inside_atom'
+      sentence += symbol
+    elif state == 'inside_atom' and symbol == '\'':
+      state = 'inside'
+      sentence += symbol
+    elif state == 'inside_atom':
+      sentence += symbol
     elif state == 'inside' and symbol == '"':
       state = 'inside_literal'
       sentence += symbol
