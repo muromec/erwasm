@@ -20,6 +20,8 @@
 
   (global $__unique_atom__utf8 i32 (i32.const 2))
   (global $__unique_atom__throw i32 (i32.const 3))
+  (global $__unique_atom__error i32 (i32.const 4))
+  (global $__unique_atom__badarg i32 (i32.const 5))
 
   (global $__unique_exception__literal_ptr_raw (mut i32) (i32.const 44))
   (export "__exception" (global $__unique_exception__literal_ptr_raw))
@@ -1078,6 +1080,17 @@
 
   (export      "erlang#atom_to_binary_1" (func $atom_to_binary_1))
 
+  (func $to_atom (param $id i32) (result i32)
+    (i32.or
+      (i32.shl
+        (local.get $id)
+        (i32.const 6)
+      )
+      (i32.const 0xB)
+    )
+  )
+  (export      "__internal#to_atom_1" (func $to_atom))
+
   (func $er_throw_2 (param $typ i32) (param $reason i32) (result i32)
     (if ;; no try catch handler all the way up to the root
       (i32.eqz (global.get $__unique_exception__literal_ptr_raw))
@@ -1100,13 +1113,7 @@
 
   (func $er_throw_1 (param $reason i32) (result i32)
     (call $er_throw_2
-      (i32.or
-        (i32.shl
-          (global.get $__unique_atom__throw)
-          (i32.const 6)
-        )
-        (i32.const 0xB)
-      )
+      (call $to_atom (global.get $__unique_atom__throw))
       (local.get $reason)
     )
    )
@@ -1216,6 +1223,21 @@
     (i32.const 0)
   )
   (export      "minibeam#clear_trace_0", (func $clear_trace))
+
+  (func $assert_atom (param $value i32) (result i32)
+    (if
+      (i32.eq (i32.and (i32.const 0x3f) (local.get $value)) (i32.const 0xb))
+      (then
+        (return (i32.const 0))
+      )
+    )
+
+    (call $er_throw_2
+      (call $to_atom (global.get $__unique_atom__error))
+      (call $to_atom (global.get $__unique_atom__badarg))
+    )
+  )
+  (export      "minibeam#assert_atom_1", (func $assert_atom))
 
 )
 

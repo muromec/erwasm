@@ -1,4 +1,4 @@
-from write.utils import push, pop, populate_stack_with, add_import
+from write.utils import push, pop, populate_stack_with, add_import, add_atom
 
 def arg(value):
   [typ, [num]] = value
@@ -122,6 +122,85 @@ class Bif:
       (call $erlang_throw_2 {push_typ} {push_val}) (drop)
       (br $start)
     '''
+
+  def bif_and(self, ctx):
+    add_import(ctx, 'minibeam', 'assert_atom', 1)
+    add_import(ctx, '__internal', 'to_atom', 1)
+
+    add_atom(ctx, 'error')
+    add_atom(ctx, 'badarg')
+    add_atom(ctx, 'true')
+    add_atom(ctx, 'false')
+
+    [val_a, val_b] = self.sargs
+
+    push_a = push(ctx, *arg(val_a))
+    push_b = push(ctx, *arg(val_b))
+
+    return f'''
+      (if
+        (call $minibeam_assert_atom_1 {push_a})
+        (then (br $start))
+      )
+      (if
+        (call $minibeam_assert_atom_1 {push_b})
+        (then (br $start))
+      )
+
+      (if  (result i32)
+        (i32.and
+          (i32.eq (global.get $__unique_atom__true) (i32.shr_u {push_a} (i32.const 6)))
+          (i32.eq (global.get $__unique_atom__true) (i32.shr_u {push_b} (i32.const 6)))
+        )
+        (then
+          (global.get $__unique_atom__true)
+        )
+        (else
+          (global.get $__unique_atom__false)
+        )
+      )
+      (call $__internal_to_atom_1)
+    '''
+
+  def bif_or(self, ctx):
+    add_import(ctx, 'minibeam', 'assert_atom', 1)
+    add_import(ctx, '__internal', 'to_atom', 1)
+
+    add_atom(ctx, 'error')
+    add_atom(ctx, 'badarg')
+    add_atom(ctx, 'true')
+    add_atom(ctx, 'false')
+
+    [val_a, val_b] = self.sargs
+
+    push_a = push(ctx, *arg(val_a))
+    push_b = push(ctx, *arg(val_b))
+
+    return f'''
+      (if
+        (call $minibeam_assert_atom_1 {push_a})
+        (then (br $start))
+      )
+      (if
+        (call $minibeam_assert_atom_1 {push_b})
+        (then (br $start))
+      )
+
+      (if  (result i32)
+        (i32.or
+          (i32.eq (global.get $__unique_atom__true) (i32.shr_u {push_a} (i32.const 6)))
+          (i32.eq (global.get $__unique_atom__true) (i32.shr_u {push_b} (i32.const 6)))
+        )
+        (then
+          (global.get $__unique_atom__true)
+        )
+        (else
+          (global.get $__unique_atom__false)
+        )
+      )
+      (call $__internal_to_atom_1)
+    '''
+
   def bif_element(self, ctx):
     jump_depth = ctx.labels_to_idx.index(self.fnumber) if self.fnumber else None
     fail_jump = f'''
