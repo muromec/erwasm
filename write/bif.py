@@ -125,12 +125,9 @@ class Bif:
 
   def bif_and(self, ctx):
     add_import(ctx, 'minibeam', 'assert_atom', 1)
-    add_import(ctx, '__internal', 'to_atom', 1)
 
     add_atom(ctx, 'error')
     add_atom(ctx, 'badarg')
-    add_atom(ctx, 'true')
-    add_atom(ctx, 'false')
 
     [val_a, val_b] = self.sargs
 
@@ -147,19 +144,11 @@ class Bif:
         (then (br $start))
       )
 
-      (if  (result i32)
-        (i32.and
+      (i32.and
           (i32.eq (global.get $__unique_atom__true) (i32.shr_u {push_a} (i32.const 6)))
           (i32.eq (global.get $__unique_atom__true) (i32.shr_u {push_b} (i32.const 6)))
-        )
-        (then
-          (global.get $__unique_atom__true)
-        )
-        (else
-          (global.get $__unique_atom__false)
-        )
       )
-      (call $__internal_to_atom_1)
+      {self.boolean_ret_helper(ctx)}
     '''
 
   def bif_or(self, ctx):
@@ -250,18 +239,43 @@ class Bif:
       )
       (local.get $temp)
     '''
+
   def bif_eq(self, ctx):
+    b = self.load_args_to_stack(ctx)
+
+    return b + '(i32.eq)\n' + self.boolean_ret_helper(ctx)
+
+
+  def bif_same(self, ctx):
     b = self.load_args_to_stack(ctx)
     add_import(ctx, 'minibeam', 'test_eq_exact', 2)
 
-    return b + '(call $minibeam_test_eq_exact_2)\n'
+    return b + '(call $minibeam_test_eq_exact_2)\n' + self.boolean_ret_helper(ctx)
+
+  def boolean_ret_helper(self, ctx):
+    add_import(ctx, '__internal', 'to_atom', 1)
+    add_atom(ctx, 'true')
+    add_atom(ctx, 'false')
+
+    return '''
+      (if  (result i32)
+        (then
+          (global.get $__unique_atom__true)
+        )
+        (else
+          (global.get $__unique_atom__false)
+        )
+      )
+      (call $__internal_to_atom_1)
+    '''
 
   def to_wat(self, ctx):
     b = f';; bif {self.op}\n'
 
     fn_name = {
       '-': 'sub',
-      '=/=': 'eq',
+      '=/=': 'same',
+      '==': 'eq',
     }.get(self.op) or self.op
     bif_fn = getattr(self, f'bif_{fn_name}', self.bif_inline)
     b += bif_fn(ctx)

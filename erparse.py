@@ -7,8 +7,15 @@ class Atom(str):
 def is_num(value):
   return '0' <= value <= '9'
 
+
+def is_latin_l(value):
+  return ('a' <= value <= 'z')
+
+def is_latin_u(value):
+  return ('A' <= value <= 'Z')
+
 def is_atom(value):
-  return ('a' <= value <= 'z') or value == '_' or ('0' <= value <= '9')
+  return is_latin_l(value) or is_latin_u(value) or value == '_' or is_num(value)
 
 def is_atom_start(value):
   return 'a' <= value <= 'z'

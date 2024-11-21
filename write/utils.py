@@ -164,6 +164,14 @@ def write_exception_handlers(ctx, mod_name, func_name):
     '''
 
 def sanitize_atom(name):
-  name = name.replace('-', '__beam_min__').replace('/', '__beam_slash__')
-  return name.replace('.', '__').lower()
+
+  name = name.replace('upper__', 'upper__beam__'
+    ).replace('-', '__beam_min__'
+    ).replace('/', '__beam_slash__'
+    ).replace('.', '__')
+
+  if name[0].isupper():
+    name = 'upper__' + name[0].lower() + name[1:]
+
+  return name
 
