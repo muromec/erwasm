@@ -30,6 +30,7 @@
   (export "__tb__literal" (global $__tb_head__literal_ptr_raw))
 
   (global $__free_mem (mut i32) (i32.const 200))
+  (export "___heap", (global $__free_mem))
 
   (func $write_flush (param $stream i32) (param $ptr i32) (param $len i32) (result i32)
       ;; pass four args to write method
@@ -1013,26 +1014,30 @@
   (export "minibeam#into_buf_utf16_3" (func $copy_into_buf_utf16))
 
   (func $atom_to_binary_2 (param $atom i32) (param $encoding i32) (result i32)
-    (if 
-      (i32.eq (i32.and (i32.const 0x3f) (local.get $atom)) (i32.const 0xb))
-      (then
-        (local.set $atom (i32.shr_u (local.get $atom) (i32.const 6)))
-      )
-      (else (unreachable)) ;; not an atom
+    (if
+      (call $assert_atom (local.get $atom))
+      (then (return (i32.const 0xFF_FF_FF_00)))
+    )
+    (if
+      (call $assert_atom (local.get $encoding))
+      (then (return (i32.const 0xFF_FF_FF_00)))
     )
 
-    (if 
-      (i32.eq (i32.and (i32.const 0x3f) (local.get $encoding)) (i32.const 0xb))
-      (then
-        (local.set $encoding (i32.shr_u (local.get $encoding) (i32.const 6)))
-      )
-      (else (unreachable)) ;; not an atom
-    )
+    (local.set $atom (i32.shr_u (local.get $atom) (i32.const 6)))
+    (local.set $encoding (i32.shr_u (local.get $encoding) (i32.const 6)))
 
     (if
       (i32.eq (local.get $encoding) (global.get $__unique_atom__utf8))
       (then (nop))
-      (else (unreachable)) ;; bad encoding
+      (else
+        ;; only utf8 is supported for now
+        (return
+          (call $er_throw_2
+            (call $to_atom (global.get $__unique_atom__error))
+            (call $to_atom (global.get $__unique_atom__badarg))
+          )
+        )
+      )
     )
 
     (local.get $atom)
@@ -1040,10 +1045,12 @@
     (i32.const 4)
     (i32.add)
     (i32.load)
+
     (i32.const 5) ;; stored size in bits, each atom is a word
     (i32.shr_u)
+
     (if
-      (i32.lt_u)
+      (i32.le_u)
       (then (nop))
       (else (unreachable)) ;; item id is not in a table
     )
@@ -1238,6 +1245,26 @@
     )
   )
   (export      "minibeam#assert_atom_1", (func $assert_atom))
+
+  (func $flip_endian (param $value i32) (result i32)
+    (i32.or
+      (i32.or
+        (i32.shr_u (local.get $value) (i32.const 24))
+        (i32.and (
+          i32.shr_u (local.get $value) (i32.const 8)) (i32.const 0xff_00)
+        )
+      )
+      (i32.or
+        (i32.and (
+          i32.shl (local.get $value) (i32.const 8)) (i32.const 0xff_00_00)
+        )
+        (i32.and
+          (i32.shl (local.get $value) (i32.const 24)) (i32.const 0xff_00_00_00)
+        )
+      )
+    )
+  )
+  (export      "__internal#flip_endian_1", (func $flip_endian))
 
 )
 

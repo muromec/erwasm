@@ -53,69 +53,24 @@ class BsMatch:
      )\n'''
 
   def helper_get_integer(self, ctx, s):
-    add_import(ctx, 'minibeam', 'bs_get_integer_ptr', 2)
+    add_import(ctx, 'minibeam', 'bs_get_integer_raw', 2)
+    add_import(ctx, 'erdump', 'hexlog', 1)
+
     bits_to_read = int(s)
 
     """
     ;; wasm doesnt have separate big endian and little instructions,
     ;; while beam has BE by default -> <<$A, $C>> is 0x4143
+    ;; integer raw converts BE to LE
     """
 
-    load8 = """
-          (i32.load8_u)
-    """
-    load16 = """
-          (i32.load16_u)
-          (local.set $temp)
-          (i32.or
-            (i32.shr_u (local.get $temp) (i32.const 8))
-            (i32.and (i32.shl (local.get $temp) (i32.const 8)) (i32.const 0xFF00))
-          )
-    """
-
-    # this is fine
-    load32 = """
-          (i32.load)
-          (local.set $temp)
-
-          (i32.or
-              (i32.or
-                (i32.shr_u (local.get $temp) (i32.const 24))
-                (i32.and (
-                  i32.shr_u (local.get $temp) (i32.const 8)) (i32.const 0xff_00)
-                )
-              )
-              (i32.or
-                (i32.and (
-                  i32.shl (local.get $temp) (i32.const 8)) (i32.const 0xff_00_00)
-                )
-                (i32.and 
-                  (i32.shl (local.get $temp) (i32.const 24)) (i32.const 0xff_00_00_00)
-                )
-              )
-         )
-    """
-    if bits_to_read == 8:
-      load = load8
-      shift = ''
-    elif bits_to_read < 8:
-      load = load8
-      shift_bits = 8 - bits_to_read
-      shift = f'(i32.const {shift_bits}) (i32.shr_u)\n'
-    elif bits_to_read == 16:
-      load = load16
-      shift = ''
-    elif bits_to_read < 16:
-      load = load16
-      shift_bits = 16 - bits_to_read
-      shift = f'(i32.const {shift_bits}) (i32.shr_u)\n'
-    elif bits_to_read == 32:
-      load = load32
+    if bits_to_read == 32:
       shift = ''
     elif bits_to_read < 32:
-      load = load32
       shift_bits = 32 - bits_to_read
       shift = f'(i32.const {shift_bits}) (i32.shr_u)\n'
+    else:
+      assert False
 
     mask = ''
     for _ignore in range(0, bits_to_read):
@@ -126,11 +81,10 @@ class BsMatch:
     return f'''
       ;; get integer from bs match s={s}, mask={hex(mask)}
       (call
-        $minibeam_bs_get_integer_ptr_2
+        $minibeam_bs_get_integer_raw_2
         { push(ctx, *self.sreg) }
         (i32.const {bits_to_read})
       )
-      { load }
       { shift }
       (i32.const {mask})
       (i32.and)
@@ -140,6 +94,7 @@ class BsMatch:
   def command_integer(self, ctx, _xn, _literal, s, n, dreg):
     load = self.helper_get_integer(ctx, s)
     dreg = arg(dreg)
+    # TODO: panic when losing precision
     return f'''
       { load }
       ;; shift to erl format

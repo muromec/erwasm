@@ -91,6 +91,8 @@ def produce_wasm(module):
       return (atom_name, atom_id)
 
   add_atom(Ctx, 'throw')
+  add_atom(Ctx, 'error')
+  add_atom(Ctx, 'badarg')
 
   for func in module.functions:
     add_atom(Ctx, str(func.name))

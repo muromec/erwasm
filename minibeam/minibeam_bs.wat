@@ -5,6 +5,7 @@
   (import "erdump" "write_buf" (func $make_erl_buf (param i32 i32) (result i32)))
   (import "minibeam" "display_1" (func $display (param i32) (result i32)))
   (import "minibeam" "is_mem_ptr_1" (func $is_mem_ptr (param i32) (result i32)))
+  (import "__internal" "flip_endian_1" (func $flip_endian (param i32) (result i32)))
 
   (data (i32.const 0) "\24\00\00\00\18\00\00\00\58\58\0a")
   (global $__0__literal_ptr_raw i32 (i32.const 0))
@@ -62,11 +63,12 @@
   )
   (export "minibeam#make_match_context_2" (func $make_match_context))
 
-  (func $bs_integer_ptr (param $ctx i32) (param $bits_number i32) (result i32)
+  (func $bs_integer_raw (param $ctx i32) (param $bits_number i32) (result i32)
     (local $ptr i32)
     (local $bin_ptr i32)
     (local $temp i32)
     (local $offset i32)
+    (local $in_byte_offset i32)
 
     (if (call $is_mem_ptr (local.get $ctx))
         (then nop)
@@ -87,6 +89,7 @@
     ;; offset is in bits
     (i32.load (i32.add (local.get $ptr) (i32.const 8)))
     (local.set $offset)
+    (local.set $in_byte_offset (i32.and (i32.const 7) (local.get $offset)))
 
     (if (call $is_mem_ptr (local.get $bin_ptr))
         (then nop)
@@ -110,8 +113,12 @@
     (i32.store (i32.add (local.get $ptr) (i32.const 8)) (local.get $offset))
 
     (local.get $temp)
+    (i32.load)
+    (call $flip_endian)
+    (local.get $in_byte_offset)
+    (i32.shl)
   )
-  (export "minibeam#bs_get_integer_ptr_2" (func $bs_integer_ptr))
+  (export "minibeam#bs_get_integer_raw_2" (func $bs_integer_raw))
 
   (func $bs_ensure_at_least (param $ctx i32) (param $unit_size_bits i32) (param $unit_round i32) (result i32)
     (local $ptr i32)
