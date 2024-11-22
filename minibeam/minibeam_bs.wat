@@ -6,6 +6,8 @@
   (import "minibeam" "display_1" (func $display (param i32) (result i32)))
   (import "minibeam" "is_mem_ptr_1" (func $is_mem_ptr (param i32) (result i32)))
   (import "__internal" "flip_endian_1" (func $flip_endian (param i32) (result i32)))
+  (import "__internal" "assert_match_ctx" (func $assert_match_ctx (param $ctx i32) (result i32) (result i32) (result i32) (result i32)))
+
 
   (data (i32.const 0) "\24\00\00\00\18\00\00\00\58\58\0a")
   (global $__0__literal_ptr_raw i32 (i32.const 0))
@@ -815,6 +817,85 @@
   )
 
   (export "minibeam#get_bit_size_utf16_1" (func $get_bit_size_utf16))
+
+  (func $match_string (param $ctx i32) (param $sz i32) (param $expect_str i32) (result i32)
+    (local $bin_ptr i32)
+    (local $ptr i32)
+    (local $offset i32)
+    (local $ret i32)
+    (local $data i32)
+    (local $data_len i32)
+    (local $expect_data i32)
+
+    (call $assert_match_ctx (local.get $ctx))
+    (local.set $ret)
+    (local.set $bin_ptr)
+    (local.set $offset)
+    (local.set $ptr)
+
+    (if (local.get $ret)
+        (then (return (local.get $ret)))
+    )
+
+    ;; nobody promised this, but it's reasonable
+    ;; to assume erlang compiler
+    ;; will give us match context
+    ;; at the byte offset
+    (if (i32.and (local.get $offset) (i32.const 7))
+        (then (unreachable))
+    )
+
+    (local.set $sz (i32.shr_u (local.get $sz) (i32.const 4)))
+
+    (local.set $data_len (i32.add (local.get $bin_ptr) (i32.const 4)))
+    (local.set $data_len (i32.sub (local.get $data_len) (local.get $offset)))
+    
+    (if (i32.gt_u (local.get $sz) (local.get $data_len))
+      (then (return (i32.const 0)))
+    )
+
+    (i32.add
+      (i32.shr_u (local.get $offset) (i32.const 3))
+      (i32.add (local.get $bin_ptr) (i32.const 8))
+    )
+    (local.set $data) ;; current data offset
+
+    (if (call $is_mem_ptr (local.get $expect_str))
+        (then nop)
+        (else unreachable)
+    )
+    (local.set $expect_data (i32.shr_u (local.get $expect_str) (i32.const 2)))
+
+    (i32.add (local.get $expect_data) (i32.const 8))
+    (local.set $expect_data) ;; expect data offset
+
+    (local.set $ret (i32.const 1))
+
+    (loop $bytes
+      (if (i32.ge_s (local.get $sz) (i32.const 8))
+        (then
+          (local.set $ret
+            (i32.and
+              (local.get $ret)
+              (i32.eq
+                (i32.load8_u (local.get $data))
+                (i32.load8_u (local.get $expect_data))
+              )
+            )
+          )
+
+          (local.set $data (i32.add (local.get $data) (i32.const 1)))
+          (local.set $expect_data (i32.add (local.get $expect_data) (i32.const 1)))
+          (local.set $sz (i32.sub (local.get $sz) (i32.const 8)))
+          (br $bytes)
+        )
+      )
+    )
+
+    (return (local.get $ret))
+  )
+  (export "minibeam#match_string_3" (func $match_string))
+
 
   (func $binary_part_3 (param $mem i32) (param $pos i32) (param $len i32) (result i32)
     (local $ptr i32)

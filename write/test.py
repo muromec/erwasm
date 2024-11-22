@@ -192,6 +192,14 @@ class Test3:
     '''
     return b
 
+  def test_bs_match_string(self, ctx):
+    add_import(ctx, 'minibeam', 'match_string', 3)
+
+    b = self.load_args_to_stack(ctx)
+    return b + '''
+      (call $minibeam_match_string_3)
+    '''
+
   def test_common(self, ctx):
     b = self.load_args_to_stack(ctx)
 

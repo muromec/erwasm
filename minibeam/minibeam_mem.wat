@@ -30,7 +30,7 @@
   (export "__tb__literal" (global $__tb_head__literal_ptr_raw))
 
   (global $__free_mem (mut i32) (i32.const 200))
-  (export "___heap", (global $__free_mem))
+  (export "___heap" (global $__free_mem))
 
   (func $write_flush (param $stream i32) (param $ptr i32) (param $len i32) (result i32)
       ;; pass four args to write method
@@ -1161,7 +1161,7 @@
     (i32.const 0)
 
   )
-  (export      "minibeam#add_trace_3", (func $add_trace))
+  (export      "minibeam#add_trace_3" (func $add_trace))
 
   (func $print_trace (result i32)
     (local $mem i32)
@@ -1216,7 +1216,7 @@
 
     (i32.const 0)
   )
-  (export      "minibeam#print_trace_0", (func $print_trace))
+  (export      "minibeam#print_trace_0" (func $print_trace))
 
   (func $clear_trace (result i32)
     (global.set $__tb_head__literal_ptr_raw
@@ -1229,7 +1229,7 @@
 
     (i32.const 0)
   )
-  (export      "minibeam#clear_trace_0", (func $clear_trace))
+  (export      "minibeam#clear_trace_0" (func $clear_trace))
 
   (func $assert_atom (param $value i32) (result i32)
     (if
@@ -1244,7 +1244,61 @@
       (call $to_atom (global.get $__unique_atom__badarg))
     )
   )
-  (export      "minibeam#assert_atom_1", (func $assert_atom))
+  (export      "minibeam#assert_atom_1" (func $assert_atom))
+
+  (func $assert_match_ctx (param $ctx i32) (result i32) (result i32) (result i32) (result i32)
+    (local $bin_ptr i32)
+    (local $ptr i32)
+    (local $offset i32)
+
+    (block $exit
+      (if (call $is_mem_ptr (local.get $ctx))
+        (then nop)
+        (else br $exit)
+      )
+      (local.set $ptr (i32.shr_u (local.get $ctx) (i32.const 2)))
+
+      (i32.load (local.get $ptr))
+      (i32.and (i32.const 0x3F))
+      (if (i32.eq (i32.const 4)) ;; has to be match ctx
+        (then nop)
+        (else br $exit)
+      )
+
+      (i32.load (i32.add (local.get $ptr) (i32.const 4)))
+      (local.set $bin_ptr)
+
+      (if (call $is_mem_ptr (local.get $bin_ptr))
+        (then nop)
+        (else br $exit)
+      )
+      (local.set $bin_ptr (i32.shr_u (local.get $bin_ptr) (i32.const 2)))
+      (i32.load (i32.add (local.get $ptr) (i32.const 8)))
+      (local.set $offset)
+
+      (i32.load (local.get $bin_ptr))
+      (i32.and (i32.const 0x3F))
+      (if (i32.eq (i32.const 0x24)) ;; has to be heap binary
+        (then nop)
+        (else br $exit)
+      )
+
+      (local.get $ptr)
+      (local.get $offset)
+      (local.get $bin_ptr)
+      (i32.const 0) ;; top of the stack
+      (return)
+    )
+
+    (i32.const 0)
+    (i32.const 0)
+    (i32.const 0)
+    (call $er_throw_2
+      (call $to_atom (global.get $__unique_atom__error))
+      (call $to_atom (global.get $__unique_atom__badarg))
+    )
+  )
+  (export      "__internal#assert_match_ctx" (func $assert_match_ctx))
 
   (func $flip_endian (param $value i32) (result i32)
     (i32.or
@@ -1264,7 +1318,7 @@
       )
     )
   )
-  (export      "__internal#flip_endian_1", (func $flip_endian))
+  (export      "__internal#flip_endian_1" (func $flip_endian))
 
 )
 
