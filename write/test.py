@@ -59,7 +59,6 @@ class Test3:
 
   def test_test_arity(self, ctx):
     [sarg, tuple_arity] = self.test_args
-    add_import(ctx, 'erdump', 'hexlog', 1)
 
     b = f'''
       ;; test test_arity
@@ -102,7 +101,6 @@ class Test3:
 
   def test_is_tuple(self, ctx):
     [sarg] = self.test_args
-    add_import(ctx, 'erdump', 'hexlog', 1)
 
     b = f'''
       ;; test is_tuple
@@ -136,7 +134,6 @@ class Test3:
   def test_is_tagged_tuple(self, ctx):
     [sarg, tuple_arity, tag_atom] = self.test_args
     assert tag_atom[0] == 'atom'
-    add_import(ctx, 'erdump', 'hexlog', 1)
 
     b = f'''
       ;; test is_tagged_tuple

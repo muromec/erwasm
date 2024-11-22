@@ -1,7 +1,6 @@
 (module
-
-  (import "erdump" "alloc" (func $alloc (param i32 i32) (result i32)))
-  (import "erdump" "hexlog_1" (func $hexlog (param i32) (result i32)))
+  (import "__internal" "alloc" (func $alloc (param i32 i32) (result i32)))
+  (import "__internal" "hexlog_1" (func $hexlog (param i32) (result i32)))
   (memory 0)
 
   (func $tuple_alloc (param $size i32) (result i32)

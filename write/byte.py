@@ -54,7 +54,6 @@ class BsMatch:
 
   def helper_get_integer(self, ctx, s):
     add_import(ctx, 'minibeam', 'bs_get_integer_raw', 2)
-    add_import(ctx, 'erdump', 'hexlog', 1)
 
     bits_to_read = int(s)
 

@@ -1,17 +1,25 @@
 (module
 
-  (import "erdump" "alloc" (func $alloc (param i32 i32) (result i32)))
-  (import "erdump" "hexlog_1" (func $hexlog (param i32) (result i32)))
-  (import "erdump" "write_buf" (func $make_erl_buf (param i32 i32) (result i32)))
   (import "minibeam" "display_1" (func $display (param i32) (result i32)))
   (import "minibeam" "is_mem_ptr_1" (func $is_mem_ptr (param i32) (result i32)))
+
+  (import "__internal" "write_buf" (func $make_erl_buf (param i32 i32) (result i32)))
+  (import "__internal" "hexlog_1" (func $hexlog (param i32) (result i32)))
+  (import "__internal" "alloc" (func $alloc (param i32 i32) (result i32)))
+  (import "__internal" "to_atom_1" (func $to_atom (param i32) (result i32)))
   (import "__internal" "flip_endian_1" (func $flip_endian (param i32) (result i32)))
   (import "__internal" "assert_match_ctx" (func $assert_match_ctx (param $ctx i32) (result i32) (result i32) (result i32)))
+  (import "erlang" "throw_2" (func $er_throw_2 (param i32) (param i32) (result i32)))
 
 
   (data (i32.const 0) "\24\00\00\00\18\00\00\00\58\58\0a")
   (global $__0__literal_ptr_raw i32 (i32.const 0))
   (global $__free_mem i32 (i32.const 16))
+
+  ;; it doesnt matter whether this numbers
+  ;; match ones in minibeam_mem
+  (global $__unique_atom__error i32 (i32.const 4))
+  (global $__unique_atom__badarg i32 (i32.const 5))
 
   (memory 0)
 
@@ -66,45 +74,27 @@
   (export "minibeam#make_match_context_2" (func $make_match_context))
 
   (func $bs_integer_raw (param $ctx i32) (param $bits_number i32) (result i32)
+    (local $ret i32)
     (local $ptr i32)
     (local $bin_ptr i32)
     (local $temp i32)
     (local $offset i32)
     (local $in_byte_offset i32)
 
-    (if (call $is_mem_ptr (local.get $ctx))
-        (then nop)
-        (else unreachable)
-    )
-    (local.set $ptr (i32.shr_u (local.get $ctx) (i32.const 2)))
-
-    (i32.load (local.get $ptr))
-    (i32.and (i32.const 0x3F))
-    (if (i32.eq (i32.const 4)) ;; has to be match ctx
-        (then nop)
-        (else unreachable)
-    )
-
-    (i32.load (i32.add (local.get $ptr) (i32.const 4)))
+    (call $assert_match_ctx (local.get $ctx))
+    (local.set $ret)
     (local.set $bin_ptr)
+    (local.set $ptr)
+
+    (if (local.get $ret)
+        (then (return (local.get $ret)))
+    )
 
     ;; offset is in bits
     (i32.load (i32.add (local.get $ptr) (i32.const 8)))
     (local.set $offset)
     (local.set $in_byte_offset (i32.and (i32.const 7) (local.get $offset)))
 
-    (if (call $is_mem_ptr (local.get $bin_ptr))
-        (then nop)
-        (else unreachable)
-    )
-    (local.set $bin_ptr (i32.shr_u (local.get $bin_ptr) (i32.const 2)))
-
-    (i32.load (local.get $bin_ptr))
-    (i32.and (i32.const 0x3F))
-    (if (i32.eq (i32.const 0x24)) ;; has to be heap binary
-        (then nop)
-        (else unreachable)
-    )
     (i32.add
       (i32.shr_u (local.get $offset) (i32.const 3))
       (i32.add (local.get $bin_ptr) (i32.const 8))
@@ -123,44 +113,26 @@
   (export "minibeam#bs_get_integer_raw_2" (func $bs_integer_raw))
 
   (func $bs_ensure_at_least (param $ctx i32) (param $unit_size_bits i32) (param $unit_round i32) (result i32)
+    (local $ret i32)
     (local $ptr i32)
     (local $bin_ptr i32)
     (local $size i32)
     (local $offset i32)
 
-    (if (call $is_mem_ptr (local.get $ctx))
-        (then nop)
-        (else unreachable)
-    )
-    (local.set $ptr (i32.shr_u (local.get $ctx) (i32.const 2)))
-
-    (i32.load (local.get $ptr))
-    (i32.and (i32.const 0x3F))
-    (if (i32.eq (i32.const 4)) ;; has to be match ctx
-        (then nop)
-        (else unreachable)
-    )
-
-    (i32.load (i32.add (local.get $ptr) (i32.const 4)))
+    (call $assert_match_ctx (local.get $ctx))
+    (local.set $ret)
     (local.set $bin_ptr)
+    (local.set $ptr)
 
-    (if (call $is_mem_ptr (local.get $bin_ptr))
-        (then nop)
-        (else unreachable)
+    (if (local.get $ret)
+        (then (return (local.get $ret)))
     )
-    (local.set $bin_ptr (i32.shr_u (local.get $bin_ptr) (i32.const 2)))
+
+    (i32.load (i32.add (local.get $bin_ptr) (i32.const 4)))
+    (local.set $size)
 
     (i32.load (i32.add (local.get $ptr) (i32.const 8)))
     (local.set $offset)
-
-    (i32.load (local.get $bin_ptr))
-    (i32.and (i32.const 0x3F))
-    (if (i32.eq (i32.const 0x24)) ;; has to be heap binary
-        (then nop)
-        (else unreachable)
-    )
-    (i32.load (i32.add (local.get $bin_ptr) (i32.const 4)))
-    (local.set $size)
 
     ;; everything above this point should be part of bs_match
     ;; and done once.
@@ -177,58 +149,6 @@
     )
   )
   (export "minibeam#bs_ensure_at_least_3" (func $bs_ensure_at_least))
-
-  (func $bs_debug (param $ctx i32) (result i32)
-    (local $ptr i32)
-    (local $bin_ptr i32)
-    (local $size i32)
-    (local $offset i32)
-
-    (if (call $is_mem_ptr (local.get $ctx))
-        (then nop)
-        (else unreachable)
-    )
-    (local.set $ptr (i32.shr_u (local.get $ctx) (i32.const 2)))
-
-    (i32.load (local.get $ptr))
-    (i32.and (i32.const 0x3F))
-    (if (i32.eq (i32.const 4)) ;; has to be match ctx
-        (then nop)
-        (else unreachable)
-    )
-
-    (i32.load (i32.add (local.get $ptr) (i32.const 4)))
-    (local.set $bin_ptr)
-
-    (if (call $is_mem_ptr (local.get $bin_ptr))
-        (then nop)
-        (else unreachable)
-    )
-    (local.set $bin_ptr (i32.shr_u (local.get $bin_ptr) (i32.const 2)))
-
-    (i32.load (i32.add (local.get $ptr) (i32.const 8)))
-    (local.set $offset)
-
-    (i32.load (local.get $bin_ptr))
-    (i32.and (i32.const 0x3F))
-    (if (i32.eq (i32.const 0x24)) ;; has to be heap binary
-        (then nop)
-        (else unreachable)
-    )
-    (i32.load (i32.add (local.get $bin_ptr) (i32.const 4)))
-    (local.set $size)
-
-    (call
-      $display
-      (i32.or
-        (i32.shl (global.get $__0__literal_ptr_raw) (i32.const 2))
-        (i32.const 2)
-      )
-    ) (drop)
-
-    (i32.const 1)
-  )
-  (export "minibeam#bs_debug_1" (func $bs_debug))
 
   (func $bs_ensure_exactly (param $ctx i32) (param $unit_size_bits i32) (result i32)
     (local $ptr i32)
@@ -658,40 +578,22 @@
     (local $offset i32)
     (local $ret i32)
 
-    (if (call $is_mem_ptr (local.get $ctx))
-        (then nop)
-        (else unreachable)
-    )
-    (local.set $ptr (i32.shr_u (local.get $ctx) (i32.const 2)))
-
-    (i32.load (local.get $ptr))
-    (i32.and (i32.const 0x3F))
-    (if (i32.eq (i32.const 4)) ;; has to be match ctx
-        (then nop)
-        (else unreachable)
-    )
-
-    (i32.load (i32.add (local.get $ptr) (i32.const 4)))
+    (call $assert_match_ctx (local.get $ctx))
+    (local.set $ret)
     (local.set $bin_ptr)
+    (local.set $ptr)
 
-    (if (call $is_mem_ptr (local.get $bin_ptr))
-        (then nop)
-        (else unreachable)
+    (if (local.get $ret)
+        (then (return (local.get $ret)))
     )
-    (local.set $bin_ptr (i32.shr_u (local.get $bin_ptr) (i32.const 2)))
+
+    (i32.load (i32.add (local.get $bin_ptr) (i32.const 4)))
+    (local.set $size)
 
     (i32.load (i32.add (local.get $ptr) (i32.const 8)))
     (local.set $offset)
 
-    (i32.load (local.get $bin_ptr))
-    (i32.and (i32.const 0x3F))
-    (if (i32.eq (i32.const 0x24)) ;; has to be heap binary
-        (then nop)
-        (else unreachable)
-    )
-    (i32.load (i32.add (local.get $bin_ptr) (i32.const 4)))
-    (local.set $size)
-
+    
     ;; everything above this point should be part of bs_match
     ;; and done once.
     ;; the reason its not inlined -- op code writers cant declare
@@ -750,29 +652,34 @@
   (func $get_bit_size (param $mem i32) (result i32)
     (local $ptr i32)
 
-    (if (call $is_mem_ptr (local.get $mem))
-        (then nop)
-        (else unreachable)
-    )
-    (local.set $ptr (i32.shr_u (local.get $mem) (i32.const 2)))
+    (block $error
+      (if (call $is_mem_ptr (local.get $mem))
+          (then nop)
+          (else (br $error))
+      )
+      (local.set $ptr (i32.shr_u (local.get $mem) (i32.const 2)))
 
-    (i32.load (local.get $ptr))
-    (i32.and (i32.const 0x3F))
-    (if (i32.eq (i32.const 0x24)) ;; has to be binary
-        (then
-          (return (call $bit_size_bin (local.get $ptr)))
-        )
+      (i32.load (local.get $ptr))
+      (i32.and (i32.const 0x3F))
+      (if (i32.eq (i32.const 0x24)) ;; has to be binary
+          (then
+            (return (call $bit_size_bin (local.get $ptr)))
+          )
+      )
+
+      (i32.load (local.get $ptr))
+      (i32.and (i32.const 0x3F))
+      (if (i32.eq (i32.const 0x4)) ;; has to be match ctx
+          (then
+            (return (call $bit_size_ctx (local.get $ptr)))
+          )
+      )
+    )
+    (call $er_throw_2
+      (call $to_atom (global.get $__unique_atom__error))
+      (call $to_atom (global.get $__unique_atom__badarg))
     )
 
-    (i32.load (local.get $ptr))
-    (i32.and (i32.const 0x3F))
-    (if (i32.eq (i32.const 0x4)) ;; has to be match ctx
-        (then
-          (return (call $bit_size_ctx (local.get $ptr)))
-        )
-    )
-
-    (unreachable)
   )
   (export "minibeam#get_bit_size_1" (func $get_bit_size))
 

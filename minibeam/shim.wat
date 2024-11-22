@@ -2,7 +2,7 @@
   ;; this is a list of function referenced from somewhere, likely jsone
   ;; but having no implementation yet
   ;; if you have nothing better to do, you can try to make one of those work
-  (import "erdump" "hexlog_1" (func $hexlog (param i32) (result i32)))
+  (import "__internal" "hexlog_1" (func $hexlog (param i32) (result i32)))
 
   (func $nop_1 (param $arg1 i32) (result i32)
     (call $hexlog (i32.const 0xDEAD_0001)) (drop)

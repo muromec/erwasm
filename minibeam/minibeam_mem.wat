@@ -49,7 +49,7 @@
 
       (call $write_flush (local.get $stdout) (local.get $ptr) (local.get $len))
   )
-  (export "erdump#log" (func $log))
+  (export "__internal#log" (func $log))
 
   (func $hexlog_format (param $value i32)
       (local $buf i32)
@@ -302,7 +302,7 @@
       (call $log (global.get $__buffer__literal_ptr_raw ) (i32.const 11))
   )
 
-  (export "erdump#hexlog_1" (func $hexlog))
+  (export "__internal#hexlog_1" (func $hexlog))
 
   (func $display (param $erl_val i32) (result i32)
       (local $len i32)
@@ -421,7 +421,7 @@
       (global.set $__free_mem (local.get $tmp))
       (local.get $ret)
   )
-  (export "erdump#alloc" (func $alloc))
+  (export "__internal#alloc" (func $alloc))
   (export "minibeam#alloc_2" (func $alloc))
 
   (func $is_mem_ptr (param $ptr i32) (result i32)
@@ -560,7 +560,7 @@
     (local.set $len (i32.sub (local.get $mem_buffer) (local.get $mem_start)))
     (local.get $len)
   )
-  (export "erdump#dump" (func $read_erl_mem ))
+  (export "__internal#dump" (func $read_erl_mem ))
 
   (func $write_str (param $mem i32) (param $len i32) (result i32)
     (local $idx i32)
@@ -617,7 +617,7 @@
     ;; (local.get $ret)
   )
 
-  (export "erdump#write_str" (func $write_str))
+  (export "__internal#write_str" (func $write_str))
 
   ;; len is in bits
   (func $alloc_write_buf (param $len i32) (result i32)
@@ -685,7 +685,7 @@
 
     (i32.or (i32.shl (local.get $ret) (i32.const 2)) (i32.const 2))
   )
-  (export "erdump#write_buf" (func $write_buf))
+  (export "__internal#write_buf" (func $write_buf))
 
   (func $copy_into_buf (param $out_offset i32) (param $out_ptr i32) (param $in_ptr i32) (param $int_size_bits i32) (result i32)
     (local $len i32)

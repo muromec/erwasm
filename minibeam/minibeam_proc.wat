@@ -3,8 +3,8 @@
 ;; actor interface
 (module
 
-  (import "erdump" "log" (func $log (param i32 i32) (result i32)))
-  (import "erdump" "hexlog_1" (func $hexlog (param i32) (result i32)))
+  (import "__internal" "log" (func $log (param i32 i32) (result i32)))
+  (import "__internal" "hexlog_1" (func $hexlog (param i32) (result i32)))
 
   (type $func (func))
   (type $cont (cont $func))
