@@ -6,7 +6,7 @@
   (import "minibeam" "display_1" (func $display (param i32) (result i32)))
   (import "minibeam" "is_mem_ptr_1" (func $is_mem_ptr (param i32) (result i32)))
   (import "__internal" "flip_endian_1" (func $flip_endian (param i32) (result i32)))
-  (import "__internal" "assert_match_ctx" (func $assert_match_ctx (param $ctx i32) (result i32) (result i32) (result i32) (result i32)))
+  (import "__internal" "assert_match_ctx" (func $assert_match_ctx (param $ctx i32) (result i32) (result i32) (result i32)))
 
 
   (data (i32.const 0) "\24\00\00\00\18\00\00\00\58\58\0a")
@@ -830,12 +830,14 @@
     (call $assert_match_ctx (local.get $ctx))
     (local.set $ret)
     (local.set $bin_ptr)
-    (local.set $offset)
     (local.set $ptr)
 
     (if (local.get $ret)
         (then (return (local.get $ret)))
     )
+
+    (i32.load (i32.add (local.get $ptr) (i32.const 8)))
+    (local.set $offset)
 
     ;; nobody promised this, but it's reasonable
     ;; to assume erlang compiler
@@ -849,10 +851,6 @@
 
     (local.set $data_len (i32.add (local.get $bin_ptr) (i32.const 4)))
     (local.set $data_len (i32.sub (local.get $data_len) (local.get $offset)))
-    
-    (if (i32.gt_u (local.get $sz) (local.get $data_len))
-      (then (return (i32.const 0)))
-    )
 
     (i32.add
       (i32.shr_u (local.get $offset) (i32.const 3))
@@ -870,6 +868,11 @@
     (local.set $expect_data) ;; expect data offset
 
     (local.set $ret (i32.const 1))
+    (local.set $offset (i32.add (local.get $offset) (local.get $sz)))
+
+    (if (i32.gt_u (local.get $sz) (local.get $data_len))
+      (then (return (i32.const 0)))
+    )
 
     (loop $bytes
       (if (i32.ge_s (local.get $sz) (i32.const 8))
@@ -892,6 +895,7 @@
       )
     )
 
+    (i32.store (i32.add (local.get $ptr) (i32.const 8)) (local.get $offset))
     (return (local.get $ret))
   )
   (export "minibeam#match_string_3" (func $match_string))

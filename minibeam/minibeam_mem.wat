@@ -1246,10 +1246,9 @@
   )
   (export      "minibeam#assert_atom_1" (func $assert_atom))
 
-  (func $assert_match_ctx (param $ctx i32) (result i32) (result i32) (result i32) (result i32)
+  (func $assert_match_ctx (param $ctx i32) (result i32) (result i32) (result i32)
     (local $bin_ptr i32)
     (local $ptr i32)
-    (local $offset i32)
 
     (block $exit
       (if (call $is_mem_ptr (local.get $ctx))
@@ -1273,8 +1272,6 @@
         (else br $exit)
       )
       (local.set $bin_ptr (i32.shr_u (local.get $bin_ptr) (i32.const 2)))
-      (i32.load (i32.add (local.get $ptr) (i32.const 8)))
-      (local.set $offset)
 
       (i32.load (local.get $bin_ptr))
       (i32.and (i32.const 0x3F))
@@ -1284,13 +1281,11 @@
       )
 
       (local.get $ptr)
-      (local.get $offset)
       (local.get $bin_ptr)
       (i32.const 0) ;; top of the stack
       (return)
     )
 
-    (i32.const 0)
     (i32.const 0)
     (i32.const 0)
     (call $er_throw_2
