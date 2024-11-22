@@ -422,12 +422,12 @@
       (local.get $ret)
   )
   (export "__internal#alloc" (func $alloc))
-  (export "minibeam#alloc_2" (func $alloc))
+  (export "__internal#alloc_2" (func $alloc))
 
   (func $is_mem_ptr (param $ptr i32) (result i32)
     (i32.eq (i32.and (local.get $ptr) (i32.const 0xF)) (i32.const 2))
   )
-  (export "minibeam#is_mem_ptr_1" (func $is_mem_ptr))
+  (export "__internal#is_mem_ptr_1" (func $is_mem_ptr))
 
   (func $log_buffer (param $buffer i32) (result i32)
     (local $len i32)

@@ -1,6 +1,6 @@
 (module
   (import "minibeam" "display_1" (func $display (param i32) (result i32)))
-  (import "minibeam" "is_mem_ptr_1" (func $is_mem_ptr (param i32) (result i32)))
+  (import "__internal" "is_mem_ptr_1" (func $is_mem_ptr (param i32) (result i32)))
   (memory 0)
 
   (func $bs_debug (param $ctx i32) (result i32)

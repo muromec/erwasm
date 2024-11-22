@@ -14,7 +14,7 @@ class Try:
     jump_depth = ctx.labels_to_idx.index(jump)
     assert not (jump_depth is None)
 
-    add_import(ctx, 'minibeam', 'alloc', 2)
+    add_import(ctx, '__internal', 'alloc', 2)
 
     pop_ex = pop(ctx, *self.exreg)
 
@@ -22,7 +22,7 @@ class Try:
       ;; start try catch block
       (global.get $__unique_exception__literal_ptr_raw)
       (local.set $temp)
-      (call $minibeam_alloc_2 (i32.const 4) (i32.const 16))
+      (call $__internal_alloc_2 (i32.const 4) (i32.const 16))
       (global.set $__unique_exception__literal_ptr_raw)
 
       (i32.store

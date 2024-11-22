@@ -1,10 +1,8 @@
 (module
 
   (import "minibeam" "display_1" (func $display (param i32) (result i32)))
-  (import "minibeam" "is_mem_ptr_1" (func $is_mem_ptr (param i32) (result i32)))
-
+  (import "__internal" "is_mem_ptr_1" (func $is_mem_ptr (param i32) (result i32)))
   (import "__internal" "write_buf" (func $make_erl_buf (param i32 i32) (result i32)))
-  (import "__internal" "hexlog_1" (func $hexlog (param i32) (result i32)))
   (import "__internal" "alloc" (func $alloc (param i32 i32) (result i32)))
   (import "__internal" "to_atom_1" (func $to_atom (param i32) (result i32)))
   (import "__internal" "flip_endian_1" (func $flip_endian (param i32) (result i32)))
