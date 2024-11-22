@@ -370,37 +370,20 @@
     (local $ret i32)
     (local $bits_consumed i32)
 
-    (if (call $is_mem_ptr (local.get $ctx))
-        (then nop)
-        (else (return (i32.const 0)))
-    )
-    (local.set $ptr (i32.shr_u (local.get $ctx) (i32.const 2)))
-
-    (i32.load (local.get $ptr))
-    (i32.and (i32.const 0x3F))
-    (if (i32.eq (i32.const 4)) ;; has to be match ctx
-        (then nop)
-        (else (return (i32.const 0)))
-    )
-
-    (i32.load (i32.add (local.get $ptr) (i32.const 4)))
+    (call $assert_match_ctx (local.get $ctx))
+    (local.set $ret)
     (local.set $bin_ptr)
+    (local.set $ptr)
 
-    (if (call $is_mem_ptr (local.get $bin_ptr))
-        (then nop)
-        (else unreachable)
+    (if (local.get $ret)
+        (then (return (local.get $ret)))
     )
-    (local.set $bin_ptr (i32.shr_u (local.get $bin_ptr) (i32.const 2)))
 
+ 
     (i32.load (i32.add (local.get $ptr) (i32.const 8)))
     (local.set $offset)
 
-    (i32.load (local.get $bin_ptr))
-    (i32.and (i32.const 0x3F))
-    (if (i32.eq (i32.const 0x24)) ;; has to be heap binary
-        (then nop)
-        (else unreachable)
-    )
+    ;; pointer to data
     (local.set $bin_ptr
       (i32.add
         (i32.shr_u (local.get $offset) (i32.const 3))
@@ -493,37 +476,19 @@
     (local $ret i32)
     (local $bits_consumed i32)
 
-    (if (call $is_mem_ptr (local.get $ctx))
-        (then nop)
-        (else (return (i32.const 0)))
-    )
-    (local.set $ptr (i32.shr_u (local.get $ctx) (i32.const 2)))
-
-    (i32.load (local.get $ptr))
-    (i32.and (i32.const 0x3F))
-    (if (i32.eq (i32.const 4)) ;; has to be match ctx
-        (then nop)
-        (else (return (i32.const 0)))
-    )
-
-    (i32.load (i32.add (local.get $ptr) (i32.const 4)))
+    (call $assert_match_ctx (local.get $ctx))
+    (local.set $ret)
     (local.set $bin_ptr)
+    (local.set $ptr)
 
-    (if (call $is_mem_ptr (local.get $bin_ptr))
-        (then nop)
-        (else unreachable)
+    (if (local.get $ret)
+        (then (return (local.get $ret)))
     )
-    (local.set $bin_ptr (i32.shr_u (local.get $bin_ptr) (i32.const 2)))
 
     (i32.load (i32.add (local.get $ptr) (i32.const 8)))
     (local.set $offset)
 
-    (i32.load (local.get $bin_ptr))
-    (i32.and (i32.const 0x3F))
-    (if (i32.eq (i32.const 0x24)) ;; has to be heap binary
-        (then nop)
-        (else unreachable)
-    )
+    ;; pointer to data
     (local.set $bin_ptr
       (i32.add
         (i32.shr_u (local.get $offset) (i32.const 3))
