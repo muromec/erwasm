@@ -16,7 +16,7 @@
 
     (i32.store ;; 0
       (local.get $ptr)
-      ;; tag is 0 zeros, then length in words
+      ;; tag is 6 zeros, then length in words
       (i32.shl (local.get $size) (i32.const 6))
     )
     (local.get $ptr)

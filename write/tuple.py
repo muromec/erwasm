@@ -154,3 +154,58 @@ class SelectTupleArity:
 
 
     return b
+
+class UpdateRecord:
+  def __init__(self, update_type, arity, sreg, dreg, table):
+    [_atom, [_inplace] ] = update_type
+    assert _atom == 'atom'
+    assert _inplace == 'inplace'
+
+    self.arity = arity
+    self.sreg = sreg
+    self.dreg = arg(dreg)
+
+    [_list, [table]] = table
+    assert _list == 'list'
+    self.table = table
+
+  def to_wat(self, ctx):
+    [offset, new_value] = self.table
+    add_import(ctx, '__internal', 'hexlog', 1)
+    b = f'''
+      ;; update_record in place
+      { populate_stack_with(ctx, self.sreg) }
+      (local.set $temp)
+
+      (local.get $temp)
+      (i32.and (i32.const 3))
+      (if
+        (i32.eq (i32.const 2)) ;; mem ref
+        (then (nop))
+        (else (unreachable))
+      )
+
+      (i32.shr_u (local.get $temp) (i32.const 2))
+      (local.set $temp) ;; raw pointer to tuple head
+
+      (i32.load (local.get $temp))
+      (i32.and (i32.const 0x3f))
+
+      (if (i32.eqz) ;; is tuple
+        (then (nop))
+        (else (unreachable))
+      )
+
+      (local.get $temp)
+      (i32.const {int(offset) * 4})
+      (i32.add)  ;; pos of element {offset}
+      { populate_stack_with(ctx, new_value) }
+      (i32.store) ;; save to mem
+
+      { populate_stack_with(ctx, self.sreg) }
+      { pop(ctx, *self.dreg) }
+
+    ;; end update record
+    '''
+    return b
+
