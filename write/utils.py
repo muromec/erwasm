@@ -175,3 +175,75 @@ def sanitize_atom(name):
 
   return name
 
+
+def add_trampoline(ctx, scope, arity):
+  args_in = ''
+  for arg_x in range(0, arity):
+    args_in += f'(param $in_{arg_x} i32) '
+
+  args_out = ''
+  for arg_x in range(0, arity):
+    args_out += f'(local.get $in_{arg_x}) '
+
+  calls = ''
+  for (fscope, target, bound_count) in ctx.bound_functions:
+    if scope != fscope:
+      continue
+
+    func = ctx.find_function(target)
+
+    if func.arity != (arity + bound_count):
+      continue
+
+    bound_args_out = ''
+    for b_arg in range(0, bound_count):
+      offset = (b_arg * 4) + 8
+      bound_args_out += f'(i32.load (i32.add (local.get $ctx) (i32.const {offset})))\n'
+
+    calls += f'''
+      (if
+        ;; check if {func.name}/{func.arity} matches
+        (i32.and
+          (i32.eq (i32.const {target}) (local.get $target))
+          (i32.eq (i32.const {bound_count}) (local.get $bound_count))
+        )
+        (then
+          { args_out }
+          { bound_args_out }
+          (call ${sanitize_atom(func.name)}_{func.arity})
+          (return)
+        )
+      )
+    '''
+
+    print ('generate arity', arity, 'trampoline for', target, 'with', bound_count, 'bound variables')
+    print ('func', func, func.arity)
+
+
+  return f'''
+    (func $__module_trampoline_{arity} (param $ctx i32) { args_in } (result i32)
+      (local $target i32)
+      (local $bound_count i32)
+
+      (i32.load (local.get $ctx))
+      (i32.const 6)
+      (i32.shr_u)
+      (local.set $target)
+
+      (i32.load (i32.add (local.get $ctx) (i32.const 4)))
+      (local.set $bound_count)
+
+      { calls }
+      (unreachable)
+    )
+  '''
+
+def write_trampolines(ctx):
+  if not ctx.trampolines:
+    return ''
+
+  ret = ';; let there be trampolines\n'
+  for (scope, arity) in ctx.trampolines:
+    ret += add_trampoline(ctx, scope, arity)
+
+  return ret

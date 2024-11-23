@@ -205,7 +205,28 @@ class Test3:
       'is_le': 'i32.le_u\n',
       'is_gt': 'i32.gt_u\n',
       'is_ge': 'i32.ge_u\n',
-      'is_function2': '(drop) (drop) (i32.const 0)\n', # its never a function
+      'is_function': '''
+        (local.set $temp)
+        (local.get $temp)
+        (i32.and (i32.const 3))
+        (if
+          (i32.eq (i32.const 2)) ;; mem ref
+          (then
+            (local.get $temp)
+            (i32.shr_u (i32.const 2))
+            (i32.load)
+            (i32.and (i32.const 0x3F))
+            (i32.eq (i32.const 0x14)) ;; should be tag 0x14
+            (local.set $temp)
+          )
+          (else
+            (i32.const 0)
+            (local.set $temp)
+          )
+        )
+        (local.get $temp)
+      ''',
+      'is_function2': '(drop) (drop) (i32.const 0)\n', # its never a function2
       'is_atom': '''
         (i32.and (i32.const 0x3F))
         (i32.eq (i32.const 0xB))

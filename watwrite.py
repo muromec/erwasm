@@ -13,13 +13,14 @@ from write.call import (
   LocalCall, LocalCallDrop, LocalCallTail,
   ExternalCall, ExternalCallDrop, ExternalCallTail,
 )
+from write.function import MakeFun3, CallFun2
 from write.bif import GcBif, Bif
 from write.block import Label, FuncInfo, BadMatch
 from write.regs import Allocate, Trim, VariableMetaNop, Swap
 from write.proc import Send
 from write.exception import Try, TryEnd, TryCase, TryCaseEnd
 
-from write.utils import make_result_n, make_in_params_n, write_atoms, add_literal, add_atoms_table_literal, write_exception_handlers, add_atom, sanitize_atom
+from write.utils import make_result_n, make_in_params_n, write_atoms, add_literal, add_atoms_table_literal, write_exception_handlers, add_atom, sanitize_atom, write_trampolines
 
 
 MODULE = '''(module
@@ -58,6 +59,8 @@ def produce_wasm(module):
   class Ctx:
     labels_to_idx = []
     imports = []
+    trampolines = []
+    bound_functions = []
     atoms = {
     }
     last_atom_id = 0
@@ -89,6 +92,16 @@ def produce_wasm(module):
       atom_id = cls.last_atom_id
       cls.atoms[atom_name] = (atom_id, offset)
       return (atom_name, atom_id)
+
+    @classmethod
+    def request_trampoline(cls, scope, arity):
+      if (scope, arity) not in cls.trampolines:
+        cls.trampolines.append((scope, arity))
+
+    @classmethod
+    def mark_trampoline(cls, scope, target, bound_count):
+      if (scope, target, bound_count) not in cls.bound_functions:
+        cls.bound_functions.append((scope, target, bound_count))
 
   add_atom(Ctx, 'throw')
   add_atom(Ctx, 'error')
@@ -180,6 +193,9 @@ def produce_wasm(module):
         'call_ext_only': ExternalCallDrop,
         'call_ext_last': ExternalCallTail,
 
+        'call_fun2': CallFun2,
+        'make_fun3': MakeFun3,
+
         'try': Try,
         'try_end': TryEnd,
         'try_case': TryCase,
@@ -227,6 +243,8 @@ def produce_wasm(module):
       localvars=localvars,
       body=b,
     )
+
+  body += write_trampolines(Ctx)
 
   add_atoms_table_literal(Ctx)
 
