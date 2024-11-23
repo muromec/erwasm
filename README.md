@@ -37,6 +37,7 @@ Things listed below mostly work:
 - utf8 and utf16 support in buffer matching and constructing;
 - basic logic and ariphmetic;
 - calling function from a different module, when statically linked;
+- passing functions as values, including bound variables;
 - exception handling.
 
 Process spawning and message passing works as a proof of concept with wasm-fx, which is under the flag in Chrome and node.
@@ -45,7 +46,6 @@ Hello world in elixir seems to work as well, but wasn't tested extensively.
 
 # What doesnt work
 
- - passing functions as arguments (map, fitler, etc);
  - there is no gc, no memory is ever deallocated;
  - calling functions by runtime-specified atom (erlang:apply);
  - deserialization of atoms;
