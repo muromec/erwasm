@@ -1,5 +1,5 @@
 from codecs import decode
-from erparse import Atom
+from erparse import Atom, Fun
 
 GLOBAL_CONST = '''
   (global ${name} i32 (i32.const {value})) ;; offset {hvalue}
@@ -137,6 +137,16 @@ def pack_literal(ctx, value):
     ret = make_word(0x24)
     ret += make_word(len(value) << 3)
     ret += list(value)
+    return ret
+
+  if isinstance(value, Fun):
+    (_matom_name, mod_atom_id) = add_atom(ctx, value.mod)
+    (_atom_name, fun_atom_id) = add_atom(ctx, value.name)
+
+    ret = make_word(0x14 | 0x80_00_00_00)
+    ret += make_word((mod_atom_id << 6) | 0xB)
+    ret += make_word((fun_atom_id << 6) | 0xB)
+    ret += make_word(value.arity)
     return ret
 
   assert False, f'cant pack as constant value {value}'
