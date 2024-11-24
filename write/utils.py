@@ -1,5 +1,5 @@
 import struct
-from erparse import Atom
+from erparse import Atom, Fun
 from write.literals import add_literal, add_named_literal, GLOBAL_CONST, pack_reg_value, add_atom
 
 FUNC_IMPORT = '''
@@ -86,6 +86,10 @@ def populate_stack_with(ctx, value):
   if value[0] == 'literal' and value[1] == []:
     value= (value[0], [[]])
 
+  if value[0] == 'literal' and value[1][0] == 'fun':
+    # FIXME: parser should know it's a function, not writer
+    value = ('fun', [Fun(*value[1][1:])])
+
   [typ, [val]] = value
   b = ''
   if typ == 'integer':
@@ -101,7 +105,7 @@ def populate_stack_with(ctx, value):
       )
       (i32.or (i32.const 0xB))
     '''
-  elif typ == 'literal' or typ == 'string':
+  elif typ == 'literal' or typ == 'string' or typ == 'fun':
     (_offset, literal_name) = add_literal(ctx, val)
     b += f'(global.get ${literal_name})\n'
   elif typ == 'x' or typ == 'y' or typ == 'fr':
@@ -238,12 +242,81 @@ def add_trampoline(ctx, scope, arity):
     )
   '''
 
+
+def add_dispatch(ctx, arity):
+  args_in = ''
+  for arg_x in range(0, arity):
+    args_in += f'(param $__unique_in_{arg_x} i32) '
+
+  args_out = ''
+  for arg_x in range(0, arity):
+    args_out += f'(local.get $__unique_in_{arg_x}) '
+
+  (atom_name, _atom_id, offset) = ctx.resolve_atom(ctx.mod_name)
+
+  atom_value = populate_stack_with(ctx, ['atom', [str(ctx.mod_name)]])
+  calls = ''
+  for (fscope, target, bound_count) in ctx.bound_functions:
+    if 'global' != fscope:
+      continue
+
+    func = ctx.find_function(target)
+
+    if func.arity != (arity + bound_count):
+      continue
+
+    fn_atom_value = populate_stack_with(ctx, ['atom', [str(func.name)]])
+
+    calls += f'''
+      (if
+        ;; check if {func.name}/{func.arity} matches
+        (i32.eq {fn_atom_value} (local.get $target_fun))
+        (then
+          { args_out }
+          (call ${sanitize_atom(func.name)}_{func.arity})
+          (return)
+        )
+      )
+    '''
+
+
+
+  return f'''
+    (func $__unique__global_dispatch_{arity} (param $__unique_ctx i32) {args_in} (result i32)
+      (local $__unique_target_mod i32)
+      (i32.load (i32.add (local.get $__unique_ctx) (i32.const 4)))
+      (local.set $__unique_target_mod)
+
+      (if (i32.eq (local.get $__unique_target_mod) {atom_value})
+          (then
+            (local.get $__unique_ctx)
+            { args_out }
+            (return (call $__export_trampoline_{arity}))
+          )
+      )
+      (unreachable)
+    )
+
+    (func $__export_trampoline_{arity} (param $ctx i32) {args_in} (result i32)
+      (local $target_fun i32)
+      (i32.load (i32.add (local.get $ctx) (i32.const 8)))
+      (local.set $target_fun)
+
+      { calls }
+
+      (unreachable)
+    )
+  '''
+
 def write_trampolines(ctx):
   if not ctx.trampolines:
     return ''
 
   ret = ';; let there be trampolines\n'
   for (scope, arity) in ctx.trampolines:
-    ret += add_trampoline(ctx, scope, arity)
+    if scope == 'module':
+      ret += add_trampoline(ctx, scope, arity)
+    elif scope == 'global':
+      ret += add_dispatch(ctx, arity)
 
   return ret

@@ -57,6 +57,7 @@ def produce_wasm(module):
   body = ''
 
   class Ctx:
+    mod_name = module.name
     labels_to_idx = []
     imports = []
     trampolines = []
@@ -106,12 +107,15 @@ def produce_wasm(module):
   add_atom(Ctx, 'throw')
   add_atom(Ctx, 'error')
   add_atom(Ctx, 'badarg')
+  add_atom(Ctx, str(module.name))
 
   for func in module.functions:
     add_atom(Ctx, str(func.name))
     Ctx.max_xregs = max(int(func.arity), 1)
     Ctx.max_yregs = 0
     if (func.name, func.arity) in module.export_funcs:
+      Ctx.request_trampoline('global', func.arity)
+      Ctx.mark_trampoline('global', func.start_label, 0)
       body += FUNC_EXPORT.format(name=func.name, arity=func.arity, mod=module.name)
 
     b = '\n'

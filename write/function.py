@@ -54,8 +54,6 @@ class CallFun2:
 
     ctx.request_trampoline('module', self.arity)
 
-    print('call bound function through a trampoline', self.arity)
-
     return f'''
       ;; call function or arity {self.arity} stored in {self.sarg}
       (block $ok
@@ -77,10 +75,23 @@ class CallFun2:
         (else (br $err))
       )
 
-      ) ;; end of err
-      (local.get $temp)
-      { args }
-      (call $__module_trampoline_{self.arity})
+
+      (if (result i32);; check if function is globally addressed
+        (i32.eq (i32.and (i32.const 0x80_00_00_00) (i32.load (local.get $temp))) (i32.const 0x80_00_00_00))
+        (then
+          (local.get $temp)
+          { args }
+          (call $__unique__global_dispatch_{self.arity})
+        )
+        (else
+          (local.get $temp)
+          { args }
+          (call $__module_trampoline_{self.arity})
+        )
+      )
       { pop(ctx, 'x', 0) }
+
+      ) ;; end of err
+
       ) ;; end of ok
     '''
