@@ -1,5 +1,6 @@
 import os
-from erparse import parse
+#from erparse import parse
+from erparse_lark import parse
 from watwrite import produce_wasm
 
 def main(fname, fname_out):

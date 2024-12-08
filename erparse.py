@@ -1,17 +1,5 @@
 from ermod import make_module
-
-class Atom(str):
-  def __repr__(self):
-    return f'<atom: {str(self)}>'
-
-class Fun:
-  def __init__(self, mod, name, arity):
-    self.mod = mod
-    self.name = name
-    self.arity = arity
-
-  def __repr__(self):
-    return f'<fun: {self.mod}#{self.name}/{self.arity}>'
+from nodes import Atom, Fun
 
 def is_num(value):
   return '0' <= value <= '9'

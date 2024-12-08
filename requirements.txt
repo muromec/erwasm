@@ -1,0 +1,3 @@
+# Install lark to generate standalone parser
+lark
+interegular
