@@ -28,8 +28,8 @@ class BadMatch:
     add_import(ctx, 'erlang', 'throw', 2)
     add_import(ctx, 'minibeam', 'tuple_alloc', 1)
 
-    push_badmatch = populate_stack_with(ctx, ['atom', ['badmatch']])
-    push_error = populate_stack_with(ctx, ['atom', ['error']])
+    push_badmatch = populate_stack_with(ctx, ['atom', 'badmatch'])
+    push_error = populate_stack_with(ctx, ['atom', 'error'])
     push_r = populate_stack_with(ctx, self.reason)
 
     return f'''

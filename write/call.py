@@ -1,14 +1,8 @@
-from write.utils import push, pop, add_import, ignore_call, sanitize_atom
-
-def arg(value):
-  [typ, [num]] = value
-  assert typ in ('x', 'y')
-  return typ, int(num)
-
+from write.utils import push, pop, add_import, ignore_call, sanitize_atom, arg
 
 class LocalCall:
   def __init__(self, arity, dest, regs=None):
-    [_f, [fnumber]] = dest
+    [_f, fnumber] = dest
     assert _f == 'f'
     self.arity = int(arity)
     self.fnumber = int(fnumber)
@@ -55,7 +49,7 @@ class LocalCallTail(LocalCall):
 
 class ExternalCall(LocalCall):
   def __init__(self, _arity, dest, regs=None):
-    (_e, [ext_mod, ext_fn, ext_fn_arity]) = dest
+    (_e, ext_mod, ext_fn, ext_fn_arity) = dest
 
     assert _e == 'extfunc', _e
     self.arity = int(ext_fn_arity)

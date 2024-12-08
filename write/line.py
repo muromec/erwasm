@@ -8,7 +8,7 @@ class Line:
       [info] = info
 
     if (info):
-      [_loc, [self.filename, self.linen]] = info
+      [_loc, self.filename, self.linen] = info
       assert _loc == 'location'
 
     else:

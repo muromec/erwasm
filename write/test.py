@@ -1,13 +1,8 @@
-from write.utils import populate_stack_with, push, pop, add_import
-
-def arg(value):
-  [typ, [num]] = value
-  assert typ in ('x', 'y')
-  return typ, int(num)
+from write.utils import populate_stack_with, push, pop, add_import, arg
 
 class Test3:
   def __init__(self, test_op, fail_dest, test_args):
-    [_f, [fnumber]] = fail_dest
+    [_f, fnumber] = fail_dest
     assert _f == 'f'
     self.fnumber = fnumber
     self.test_args = test_args
@@ -353,7 +348,7 @@ class Test3:
 class Test5:
   def __init__(self, test_op, fail_dest, _dn, test_args, dest):
 
-    [_f, [fnumber]] = fail_dest
+    [_f, fnumber] = fail_dest
     assert _f == 'f'
     self.fnumber = fnumber
     self.test_args = test_args
@@ -396,7 +391,7 @@ class Test5:
   def test_bs_get_utf8(self, ctx):
     add_import(ctx, 'minibeam', 'get_utf8_from_ctx', 1)
 
-    [_tr, [match_ctx_reg, [_reg_type, _n]]] = self.test_args[0]
+    [_tr, match_ctx_reg, [_reg_type, _n]] = self.test_args[0]
     assert _tr == 'tr'
     assert _reg_type == 't_bs_context'
 
@@ -419,7 +414,7 @@ class Test5:
   def test_bs_get_utf16(self, ctx):
     add_import(ctx, 'minibeam', 'get_utf16_from_ctx', 1)
 
-    [_tr, [match_ctx_reg, [_reg_type, _n]]] = self.test_args[0]
+    [_tr, match_ctx_reg, [_reg_type, _n]] = self.test_args[0]
     assert _tr == 'tr'
     assert _reg_type == 't_bs_context'
 
@@ -442,7 +437,7 @@ class Test5:
   def test_bs_get_binary2(self, ctx):
     add_import(ctx, 'minibeam', 'get_binary_from_ctx', 2)
 
-    [_tr, [match_ctx_reg, [_reg_type, _n]]] = self.test_args[0]
+    [_tr, match_ctx_reg, [_reg_type, _n]] = self.test_args[0]
     assert _tr == 'tr'
     assert _reg_type == 't_bs_context'
 

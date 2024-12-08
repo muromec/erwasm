@@ -2,11 +2,11 @@ from write.utils import arg, push, pop, add_import, populate_stack_with
 
 class MakeFun3:
   def __init__(self, ftarget, n, nn, darg, bounds):
-    [_f, [target]] = ftarget
+    [_f, target] = ftarget
     assert _f == 'f'
     self.target = int(target)
     self.darg = arg(darg)
-    [_list, [bounds]] = bounds
+    [_list, bounds] = bounds
     assert _list == 'list'
     self.bounds = bounds
 
@@ -41,7 +41,7 @@ class MakeFun3:
 
 class CallFun2:
   def __init__(self, typ, arity, sarg):
-    [_atom, [typ]] = typ
+    [_atom, typ] = typ
     self.arity = int(arity)
     self.sarg = sarg
     assert _atom == 'atom'

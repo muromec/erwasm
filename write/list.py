@@ -1,9 +1,4 @@
-from write.utils import push, pop, add_import, arg, populate_stack_with
-
-def arg(value):
-  [typ, [num]] = value
-  assert typ in ('x', 'y')
-  return typ, int(num)
+from write.utils import push, pop, add_import, arg, populate_stack_with, arg
 
 
 class GetList:

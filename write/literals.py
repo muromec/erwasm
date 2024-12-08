@@ -92,15 +92,6 @@ def pack_reg_value(ctx, value):
 
   assert False, ('unknown typ', value, type(value))
 
-def fix_tuple(value):
-  if len(value) == 2 and isinstance(value[1], list):
-    value = (value[0],) + tuple(value[1])
-  value = tuple((
-    fix_tuple(item) if isinstance(item, tuple) else item
-    for item in value
-  ))
-  return value
-
 def pack_literal(ctx, value):
   if isinstance(value, Atom) or isinstance(value, int):
     return make_word(pack_reg_value(ctx, value))
@@ -126,7 +117,6 @@ def pack_literal(ctx, value):
     return ret
 
   if isinstance(value, tuple):
-    value = fix_tuple(value)
     ret = make_word(len(value) << 6)
     for s_value in value:
       ret += make_word(pack_reg_value(ctx, s_value))

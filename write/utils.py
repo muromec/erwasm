@@ -78,19 +78,12 @@ def populate_stack_with(ctx, value):
     return '(i32.const 0x3b)\n'
 
   if isinstance(value, int):
-    value = ['integer', [value]]
+    value = ['integer', value]
 
   if value[0] == 'tr':
-    value = value[1][0]
+    value = value[1]
 
-  if value[0] == 'literal' and value[1] == []:
-    value= (value[0], [[]])
-
-  if value[0] == 'literal' and value[1][0] == 'fun':
-    # FIXME: parser should know it's a function, not writer
-    value = ('fun', [Fun(*value[1][1:])])
-
-  [typ, [val]] = value
+  [typ, val] = value
   b = ''
   if typ == 'integer':
     pval = pack_reg_value(ctx, int(val))
@@ -121,9 +114,9 @@ def populate_with(ctx, dtyp, dnum, value):
   return b
 
 def arg(value):
-  [typ, [num]] = value
+  [typ, num] = value
   typ = str(typ)
-  assert typ in ('x', 'y'), f'Wrong type {typ}'
+  assert typ in ('x', 'y', 'fr'), f'Wrong type {typ}'
   return typ, int(num)
 
 def add_atoms_table_literal(ctx):
@@ -254,7 +247,7 @@ def add_dispatch(ctx, arity):
 
   (atom_name, _atom_id, offset) = ctx.resolve_atom(ctx.mod_name)
 
-  atom_value = populate_stack_with(ctx, ['atom', [str(ctx.mod_name)]])
+  atom_value = populate_stack_with(ctx, ['atom', str(ctx.mod_name)])
   calls = ''
   for (fscope, target, bound_count) in ctx.bound_functions:
     if 'global' != fscope:
@@ -265,7 +258,7 @@ def add_dispatch(ctx, arity):
     if func.arity != (arity + bound_count):
       continue
 
-    fn_atom_value = populate_stack_with(ctx, ['atom', [str(func.name)]])
+    fn_atom_value = populate_stack_with(ctx, ['atom', str(func.name)])
 
     calls += f'''
       (if

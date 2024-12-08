@@ -1,13 +1,8 @@
-from write.utils import push, pop, populate_stack_with, add_import, add_atom
-
-def arg(value):
-  [typ, [num]] = value
-  assert typ in ('x', 'y', 'fr')
-  return typ, int(num)
+from write.utils import push, pop, populate_stack_with, add_import, add_atom, arg
 
 class Bif:
   def __init__(self, op, fdest, sargs, dest):
-    [_f, [fnumber]] = fdest
+    [_f, fnumber] = fdest
     assert _f == 'f'
 
     self.sargs = sargs
@@ -288,7 +283,7 @@ class Bif:
 
 class GcBif(Bif):
   def __init__(self, op, fdest, _max_regs, sargs, dest):
-    [_f, [fnumber]] = fdest
+    [_f, fnumber] = fdest
     assert _f == 'f'
 
     self.sargs = sargs

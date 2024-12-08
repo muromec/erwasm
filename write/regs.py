@@ -1,9 +1,4 @@
-from write.utils import move, push, pop
-
-def arg(value):
-  [typ, [num]] = value
-  assert typ in ('x', 'y')
-  return typ, int(num)
+from write.utils import move, push, pop, arg
 
 class Allocate:
   def __init__(self, yreg, xreg):

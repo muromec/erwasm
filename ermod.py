@@ -31,22 +31,23 @@ def make_module(parse_beam):
   for sentence in parse_beam:
     typ = sentence[0]
     if typ == 'module':
-      [name] = sentence[1]
+      [typ, name] = sentence
       module_name = name
     if typ == 'exports':
-      [func_list] = sentence[1]
+      [typ, func_list] = sentence
       export_funcs = [
-         (func[0], int(func[1][0]))
+         (func[0], int(func[1]))
          for func in func_list
       ]
     if typ == 'function':
-      [name, arity, start_label] = sentence[1]
+      [typ, name, arity, start_label] = sentence
       current_func = Func(name, int(arity), int(start_label))
       functions.append(current_func)
     if typ == 'attributes':
+      [typ, attr_list] = sentence
       attrs.update([
         (key, value[0])
-        for key, value in sentence[1][0]
+        for key, value in attr_list
       ])
     elif current_func:
       current_func.statements.append(sentence)

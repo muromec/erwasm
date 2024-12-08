@@ -2,12 +2,12 @@ from write.utils import push, pop, add_import, arg, populate_with, populate_stac
 
 class BsMatch:
   def __init__(self, fail_dest, sarg, command_table):
-    [_f, [fnumber]] = fail_dest
+    [_f, fnumber] = fail_dest
     assert _f == 'f'
     self.fnumber = fnumber
 
     self.sreg = arg(sarg)
-    [_c, [table]] = command_table
+    [_c, table] = command_table
     assert _c == 'commands'
 
     self.commands = table
@@ -19,7 +19,8 @@ class BsMatch:
     b += f'(local.set $jump (i32.const {jump_depth}));; to label {self.fnumber}\n'
 
     for cmd in self.commands:
-      [cmd_name, cmd_args] = cmd
+      cmd_name = cmd[0]
+      cmd_args = cmd[1:]
       b + ';; chech {cmd_name}'
 
       if cmd_name == '=:=':
@@ -197,7 +198,7 @@ class BsGetTail:
 
 class BsStartMatch:
   def __init__(self, params, max_regs, sarg, darg):
-    [_a, [op]] = params
+    [_a, op] = params
 
     self.sarg = sarg
     self.sreg = arg(sarg)
@@ -231,7 +232,7 @@ class BsStartMatch:
 class BsCreateBin:
   def __init__(self, fdest, alloc, live, unit, darg, ops):
     self.dreg = arg(darg)
-    [_list, [ops]] = ops
+    [_list, ops] = ops
     assert _list == 'list'
     self.ops = ops
 
@@ -249,14 +250,14 @@ class BsCreateBin:
     to_read = []
 
     while ops:
-      (_atom, [typ]) = ops.pop(0)
+      (_atom, typ) = ops.pop(0)
       _ignore_align = ops.pop(0)
       unit_size = ops.pop(0)
       _nil = ops.pop(0)
       value = ops.pop(0)
 
       if value[0] == 'tr':
-        value = value[1][0]
+        value = value[1]
 
       value = populate_stack_with(ctx, value)
 
@@ -265,9 +266,9 @@ class BsCreateBin:
         arg = ops.pop(0)
         if not isinstance(arg, tuple):
           pass
-        elif arg[0] == 'atom' and arg[1][0] == 'all':
+        elif arg[0] == 'atom' and arg[1] == 'all':
           pass
-        elif arg[0] == 'atom' and arg[1][0] == 'undefined':
+        elif arg[0] == 'atom' and arg[1] == 'undefined':
           pass
         elif arg[0] == 'atom':
           ops.insert(0, arg)
@@ -284,12 +285,12 @@ class BsCreateBin:
       if not isinstance(option, (list, tuple)):
         return
       if option[0] == 'integer':
-        return int(option[1][0])
+        return int(option[1])
 
     def match_op(op_name, option):
       if not isinstance(option, (list, tuple)):
         return
-      return option[0] == 'atom' and option[1][0] == op_name
+      return option[0] == 'atom' and option[1] == op_name
 
     def find_op(values, fn):
       for value in values:

@@ -2,9 +2,9 @@ from write.utils import populate_stack_with
 
 class SelectVal:
   def __init__(self, sarg, dest, value_table):
-    [_f, [fnumber]] = dest
+    [_f, fnumber] = dest
     assert _f == 'f'
-    [_l, [comp_table]] = value_table
+    [_l, comp_table] = value_table
     assert _l == 'list'
 
     self.fnumber = fnumber
@@ -19,7 +19,7 @@ class SelectVal:
 
     while comp_table:
       value = comp_table.pop(0)
-      [_f, [jump]] = comp_table.pop(0)
+      [_f, jump] = comp_table.pop(0)
 
       jump_depth = ctx.labels_to_idx.index(jump)
       b += f'(local.set $jump (i32.const {jump_depth}));; to label {jump}\n'

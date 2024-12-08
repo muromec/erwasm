@@ -130,7 +130,7 @@ def produce_wasm(module):
     b += f';; arity {func.arity}, input put into X registers\n'
 
     labels = list([
-      statement[1][0]
+      statement[1]
       for statement in func.statements
       if statement[0] == 'label'
     ])
@@ -156,7 +156,8 @@ def produce_wasm(module):
 
     for statement in func.statements[1:]:
       styp = statement[0]
-      sbody = statement[1]
+      sbody = statement[1:]
+      # print('sbody', sbody)
 
       op_cls = {
         'label': Label,

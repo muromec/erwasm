@@ -4,7 +4,7 @@ from write.utils import add_import, pop, push, arg
 class Try:
   def __init__(self, exreg, fail_dest):
     self.exreg = arg(exreg)
-    [_f, [fnumber]] = fail_dest
+    [_f, fnumber] = fail_dest
     assert _f == 'f'
     self.fnumber = fnumber
 

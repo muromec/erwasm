@@ -1,7 +1,7 @@
 
 class Jump:
   def __init__(self, dest):
-    [_f, [fnumber]] = dest
+    [_f, fnumber] = dest
     assert _f == 'f'
     self.fnumber = fnumber
 

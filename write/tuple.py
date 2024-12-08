@@ -9,7 +9,7 @@ class PutTuple2:
     b = ';; put_tuple2\n'
     add_import(ctx, 'minibeam', 'tuple_alloc', 1)
 
-    [_list, [vlist]] = self.value
+    [_list, vlist] = self.value
     assert _list == 'list'
 
     size = len(vlist)
@@ -81,11 +81,11 @@ class GetTupleElement:
 
 class SelectTupleArity:
   def __init__(self, sarg, fail, table):
-    [_tr, [sarg, _info]] = sarg
+    [_tr, sarg, _info] = sarg
     assert _tr == 'tr'
     self.sarg = arg(sarg)
     self.fail = fail
-    [_list, [table]] = table
+    [_list, table] = table
     assert _list == 'list'
     self.table = table
 
@@ -128,7 +128,7 @@ class SelectTupleArity:
     table = self.table[:]
     while table:
       arity = table.pop(0)
-      [_f, [jump]] = table.pop(0)
+      [_f, jump] = table.pop(0)
       assert _f == 'f'
       jump = int(jump)
       jump_depth = ctx.labels_to_idx.index(jump)
@@ -141,7 +141,7 @@ class SelectTupleArity:
         (br_if $start)
       '''
 
-    [_f, [jump]] = self.fail
+    [_f, jump] = self.fail
     jump = int(jump)
     jump_depth = ctx.labels_to_idx.index(jump)
 
@@ -157,7 +157,7 @@ class SelectTupleArity:
 
 class UpdateRecord:
   def __init__(self, update_type, arity, sreg, dreg, table):
-    [_atom, [_inplace] ] = update_type
+    [_atom, _inplace] = update_type
     assert _atom == 'atom'
     assert _inplace == 'inplace'
 
@@ -165,7 +165,7 @@ class UpdateRecord:
     self.sreg = sreg
     self.dreg = arg(dreg)
 
-    [_list, [table]] = table
+    [_list, table] = table
     assert _list == 'list'
     self.table = table
 
