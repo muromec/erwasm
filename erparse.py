@@ -164,9 +164,9 @@ def parse_sentence_helper(text, State, depth):
   # TODO: remove this
   if not child_sentence:
     return child_sentence
-  if isinstance(child_sentence[0], Atom):
-    child_sentence_old = (child_sentence[0], list(child_sentence[1:]))
-    return child_sentence_old
+  #if isinstance(child_sentence[0], Atom):
+  #  child_sentence_old = (child_sentence[0], list(child_sentence[1:]))
+  #  return child_sentence_old
 
   return tuple(child_sentence)
 
@@ -176,7 +176,7 @@ def parse_sentence(text):
    idx = 1
 
   if text == 'return':
-    return 'return', []
+    return ('return',)
 
   if text == 'send':
     return 'send', []
