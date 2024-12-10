@@ -121,49 +121,99 @@ def parse_atoms(data):
 
   return ret
 
+
+def parse_imports(data, atoms):
+  (count,) = struct.unpack_from('>I', data)
+  offset = 4
+  ret = ()
+  while count > 0:
+    (mod, fn, arity) = struct.unpack_from('>III', data, offset = offset)
+    mod = atoms[mod - 1]
+    fn = atoms[fn - 1]
+    offset += 12
+    count -= 1
+
+    ret += ((mod, fn, arity),)
+
+  return ret
+
+
 op_tab = {
   0x01: ('label', 1),
   0x02: ('func_info', 3),
   0x03: ('end', 0),
+  0x04: ('call', 2),
+  0x05: ('call_last', 3),
   0x06: ('call_only', 2),
+  0x07: ('call_ext', 2),
+  0x08: ('call_ext_last', 3),
+  0x0b: ('bif2', 5),
+  0x0a: ('bif1', 4),
+  0x0c: ('allocate', 2),
+  0x10: ('test_heap', 2),
+  0x12: ('deallocate', 1),
   0x13: ('return', 0),
-  0x3b: ('select_val', 3), ## WRONG
+  0x27: ('is_lt', 3),
+  0x2b: ('is_eq_exact', 3),
+  0x28: ('is_ge', 3),
+  0x35: ('is_binary', 2),
+  0x3b: ('select_val', 3),
   0x40: ('move', 2),
   0x4e: ('call_ext_only', 2),
   0x4a: ('case_end', 1), # this raises error
+  0x7d: ('gc_bif2', 6),
   0x99: ('line', 1),
 }
 
 
-def consume_arg(data, offset, literals, atoms):
+def consume_arg(data, offset, literals, atoms, imports):
   value = data[offset]
   size = 1
+  # print('v', hex(value))
+
   if value == 0x47:
     lnum = data[offset + 1] >> 4
     value = literals[lnum]
+    size = 2
+  elif value == 0x57:
+    lnum = data[offset + 1:offset+4]
+    value = ('wat', lnum) # what even?
+    size = 3
+  elif value == 0x08:
+    value = data[offset + 1]
+    size = 2
+  elif value == 0x0A:
+    atom_id = data[offset + 1]
+    value = atoms[atom_id - 1]
     size = 2
   elif value == 0x17:
     value = []
     asize = data[offset + 1] >> 4
     offset = offset + 2
-    print('consume arg', offset, asize)
+
     while asize:
-      (apart, offset) = consume_arg(data, offset, literals, atoms)
+      (apart, offset) = consume_arg(data, offset, literals, atoms, imports)
       asize -= 1
       value.append(apart)
+
     return (value, offset)
+
   elif (value & 0xF) == 5:
     value = ('label', value >> 4)
   elif (value & 0xF) == 2:
     atom_id = value >> 4
-    value = atoms[atom_id]
+    value = atoms[atom_id - 1]
   elif (value & 0xF) == 3:
     value = ('reg', 'x', value >> 4)
+  elif (value & 0xF) == 0:
+    value = value >> 4
+  elif (value & 0xF) == 1:
+    value = value >> 4
   else:
     value = hex(value)
   return (value, offset + size)
 
-def parse_code(data, literals, atoms):
+def parse_code(data, literals, atoms, imports):
   offset = 0
   (header1, header2, header3, header4, header5) = struct.unpack_from('>IIIII', data, offset=offset)
   print('header1', hex(header1))
@@ -187,7 +237,7 @@ def parse_code(data, literals, atoms):
 
     args = []
     while arity > 0:
-      (arg, offset) = consume_arg(data, offset, literals, atoms)
+      (arg, offset) = consume_arg(data, offset, literals, atoms, imports)
       arity -= 1
       args.append(arg)
 
@@ -202,9 +252,12 @@ def main(fname):
   chunks = parse_beam_chunks(data)
 
   atoms = parse_atoms(chunks['AtU8'])
-  literals = parse_literals(chunks['LitT'])
-  print('literals', literals)
-  parse_code(chunks['Code'], literals, atoms)
+  imports = parse_imports(chunks['ImpT'], atoms)
+  literals = parse_literals(chunks['LitT']) if 'LitT' in chunks else []
+  parse_code(chunks['Code'], literals, atoms, imports)
+
+  print('atoms', atoms)
+  print('imports', imports)
 
 
 if __name__ == '__main__':
