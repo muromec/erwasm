@@ -81,6 +81,8 @@ def populate_stack_with(ctx, value):
     value = ['integer', value]
   if isinstance(value, Atom):
     value = ['atom', value]
+  if isinstance(value, bytes):
+    value = ['literal', value]
 
   if value[0] == 'tr':
     value = value[1]

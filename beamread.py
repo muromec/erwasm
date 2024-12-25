@@ -172,6 +172,7 @@ op_tab = {
   0x27: ('is_lt', 3),
   0x2b: ('is_eq_exact', 3),
   0x28: ('is_ge', 3),
+  0x30: ('is_atom', 2),
   0x35: ('is_binary', 2),
   0x3b: ('select_val', 3),
   0x40: ('move', 2),
@@ -185,16 +186,14 @@ op_tab = {
 def consume_arg(data, offset, literals, atoms, imports):
   value = data[offset]
   size = 1
-  # print('v', hex(value))
 
   if value == 0x47:
     lnum = data[offset + 1] >> 4
     value = literals[lnum]
     size = 2
   elif value == 0x57:
-    lnum = data[offset + 1:offset+4]
-    value = ('wat', lnum) # what even?
-    size = 3
+    (value, offset) = consume_arg(data, offset + 1, literals, atoms, imports)
+    return (value, offset + 1)
   elif value == 0x08:
     value = data[offset + 1]
     size = 2
@@ -221,10 +220,20 @@ def consume_arg(data, offset, literals, atoms, imports):
     value = atoms[atom_id - 1]
   elif (value & 0xF) == 3:
     value = ('reg', 'x', value >> 4)
+  elif (value & 0xF) == 4:
+    value = ('reg', 'y', value >> 4)
   elif (value & 0xF) == 0:
     value = value >> 4
   elif (value & 0xF) == 1:
     value = value >> 4
+  elif (value & 0x8):
+    read_bytes = value & 0x7
+    value = 0
+    size = 1
+    while read_bytes:
+      value = value << 8 | data[offset + size]
+      size += 1
+      read_bytes -= 1
   else:
     value = hex(value)
   return (value, offset + size)

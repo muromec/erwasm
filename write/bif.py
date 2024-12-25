@@ -1,14 +1,14 @@
 from write.utils import push, pop, populate_stack_with, add_import, add_atom, arg
 
 class Bif:
-  def __init__(self, op, fdest, sargs, dest):
+  def __init__(self, fdest, import_id, sarg1, sarg2, dest):
     [_f, fnumber] = fdest
-    assert _f == 'f'
+    assert _f == 'label'
 
-    self.sargs = sargs
+    self.sargs = [sarg1, sarg2]
     self.darg = arg(dest)
-    bif = op
     self.fnumber = fnumber
+    self.import_id = import_id
 
   def load_args_to_stack(self, ctx):
     b = ''
@@ -272,12 +272,14 @@ class Bif:
     assert arity == len(self.sargs)
     assert _mod == 'erlang'
 
+
     fn_name = {
       '-': 'sub',
       '=/=': 'same',
       '==': 'eq',
     }.get(bif) or bif
-    bif_fn = getattr(self, f'bif_{bif}', self.bif_inline)
+    print('found bif', bif, fn_name)
+    bif_fn = getattr(self, f'bif_{fn_name}', self.bif_inline)
     b += bif_fn(ctx)
 
     b += pop(ctx, *self.darg)
@@ -295,4 +297,3 @@ class GcBif(Bif):
     self.darg = arg(dest)
     self.import_id = bif
     self.fnumber = fnumber
-

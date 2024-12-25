@@ -3,7 +3,7 @@ from write.utils import push, pop, add_import, ignore_call, sanitize_atom, arg
 class LocalCall:
   def __init__(self, arity, dest, regs=None):
     [_f, fnumber] = dest
-    assert _f == 'f'
+    assert _f == 'label'
     self.arity = int(arity)
     self.fnumber = int(fnumber)
     self.regs = regs
@@ -62,7 +62,7 @@ class ExternalCall(LocalCall):
     ctx.max_xregs = max(ctx.max_xregs, self.arity)
 
     return f'''
-      (call ${sanitize_atom(self.ext_mod)}_{sanitize_atom(self.ext_fn)}_{self.arity})
+      (call ${sanitize_atom(ext_mod)}_{sanitize_atom(ext_fn)}_{self.arity})
       (local.set $temp)
       (if (i32.eq (local.get $temp) (i32.const 0xFF_FF_FF_00))
           (then (br $start))

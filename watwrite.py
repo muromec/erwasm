@@ -15,7 +15,7 @@ from write.call import (
 )
 from write.function import MakeFun3, CallFun2
 from write.bif import GcBif, Bif
-from write.block import Label, FuncInfo, BadMatch
+from write.block import Label, FuncInfo, BadMatch, CaseEnd, Nop
 from write.regs import Allocate, Trim, VariableMetaNop, Swap
 from write.proc import Send
 from write.exception import Try, TryEnd, TryCase, TryCaseEnd
@@ -179,6 +179,7 @@ def produce_wasm(module):
         'return': Ret,
         'select_val': SelectVal,
         'badmatch': BadMatch,
+        'case_end': CaseEnd,
 
         'put_list': PutList,
         'put_tuple2': PutTuple2,
@@ -187,6 +188,7 @@ def produce_wasm(module):
         'update_record': UpdateRecord,
 
         'allocate': Allocate,
+        'deallocate': Nop, # GC, wat gc?
         'trim': Trim,
         'swap': Swap,
         '%': VariableMetaNop,
@@ -211,11 +213,14 @@ def produce_wasm(module):
         'try_case_end': TryCaseEnd,
 
         'gc_bif2': GcBif,
-        'bif': Bif,
+        'bif2': Bif,
 
         'send': Send,
       }.get(styp)
-      op_imp = op_cls(*sbody) if op_cls else None
+      if styp.startswith('is_'):
+        op_imp = Test(styp, *sbody)
+      else:
+        op_imp = op_cls(*sbody) if op_cls else None
 
       if op_imp:
         b += op_imp.to_wat(Ctx)

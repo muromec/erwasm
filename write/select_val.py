@@ -3,14 +3,13 @@ from write.utils import populate_stack_with
 class SelectVal:
   def __init__(self, sarg, dest, value_table):
     [_f, fnumber] = dest
-    assert _f == 'f'
-    [_l, comp_table] = value_table
-    assert _l == 'list'
+    assert _f == 'label'
+    assert isinstance(value_table, list)
 
     self.fnumber = fnumber
     self.sarg = sarg
     self.dest = dest
-    self.comp_table = comp_table
+    self.comp_table = value_table
 
   def to_wat(self, ctx):
     comp_table = self.comp_table[:]

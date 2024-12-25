@@ -51,3 +51,19 @@ class BadMatch:
       (call $erlang_throw_2 {push_error} (local.get $temp)) (drop)
       (br $start)
     '''
+
+class CaseEnd:
+  def __init__(self, reason):
+    self.reason = reason
+
+  def to_wat(self, ctx):
+    # TODO: actually throw an error
+    return f'(unreachable)\n'
+
+
+class Nop:
+  def __init__(self, *args):
+    pass
+
+  def to_wat(self, ctx):
+    return ';; something was ignored\n'
