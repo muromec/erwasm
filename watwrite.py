@@ -104,6 +104,10 @@ def produce_wasm(module):
       if (scope, target, bound_count) not in cls.bound_functions:
         cls.bound_functions.append((scope, target, bound_count))
 
+    @classmethod
+    def resolve_import(ctx, import_id):
+      return module.resolve_import(import_id)
+
   add_atom(Ctx, 'throw')
   add_atom(Ctx, 'error')
   add_atom(Ctx, 'badarg')
@@ -150,14 +154,14 @@ def produce_wasm(module):
     b += f'unreachable\n'
 
     current_label = None
-    assert func.statements[0][0] == 'function'
+    # assert func.statements[0][0] == 'function'
 
     Ctx.labels_to_idx = labels_to_idx
 
-    for statement in func.statements[1:]:
+    for statement in func.statements:
       styp = statement[0]
       sbody = statement[1:]
-      # print('sbody', sbody)
+      # print('sbody', styp, sbody)
 
       op_cls = {
         'label': Label,
@@ -206,7 +210,7 @@ def produce_wasm(module):
         'try_case': TryCase,
         'try_case_end': TryCaseEnd,
 
-        'gc_bif': GcBif,
+        'gc_bif2': GcBif,
         'bif': Bif,
 
         'send': Send,

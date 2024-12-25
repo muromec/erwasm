@@ -48,20 +48,17 @@ class LocalCallTail(LocalCall):
 
 
 class ExternalCall(LocalCall):
-  def __init__(self, _arity, dest, regs=None):
-    (_e, ext_mod, ext_fn, ext_fn_arity) = dest
-
-    assert _e == 'extfunc', _e
-    self.arity = int(ext_fn_arity)
-    self.ext_mod = ext_mod
-    self.ext_fn = ext_fn
-    self.regs = regs
+  def __init__(self, arity, dest, regs=None):
+    self.arity = arity
+    self.dest = dest
 
   def make_call(self, ctx):
-    if ignore_call(self.ext_mod, self.ext_fn):
+    ext_mod, ext_fn, import_arity = ctx.resolve_import(self.dest)
+    assert import_arity == self.arity
+    if ignore_call(ext_mod, ext_fn):
       return ''
 
-    add_import(ctx, self.ext_mod, self.ext_fn, self.arity)
+    add_import(ctx, ext_mod, ext_fn, self.arity)
     ctx.max_xregs = max(ctx.max_xregs, self.arity)
 
     return f'''

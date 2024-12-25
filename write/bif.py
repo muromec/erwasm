@@ -7,7 +7,7 @@ class Bif:
 
     self.sargs = sargs
     self.darg = arg(dest)
-    self.op = op
+    bif = op
     self.fnumber = fnumber
 
   def load_args_to_stack(self, ctx):
@@ -18,14 +18,15 @@ class Bif:
     return b
 
   def make_bif(self, ctx):
+    (_mod, bif, arity) = ctx.resolve_import(self.import_id)
     b = ''
-    if self.op == "+":
+    if bif == "+":
       b += '(i32.xor (i32.const 0xF))\n'
       b += '(i32.add)\n'
-    elif self.op ==  "-":
+    elif bif ==  "-":
       b += '(i32.xor (i32.const 0xF))\n'
       b += '(i32.sub)\n'
-    elif self.op == "*":
+    elif bif == "*":
       b += '''
       (i32.shr_u (i32.xor (i32.const 0xF)) (i32.const 4))
       (local.set $temp)
@@ -36,7 +37,7 @@ class Bif:
       (i32.shl (local.get $temp) (i32.const 4))
       (i32.or (i32.const 0xF))
       '''
-    elif self.op == "byte_size":
+    elif bif == "byte_size":
       add_import(ctx, 'minibeam', 'get_bit_size', 1)
       b += f'''
         (call $minibeam_get_bit_size_1)
@@ -45,10 +46,10 @@ class Bif:
         (i32.shl)
         (i32.or (i32.const 0xF))
       '''
-    elif self.op == "length":
+    elif bif == "length":
       add_import(ctx, 'erlang', 'length', 1)
       b += f'''(call $erlang_length_1)\n'''
-    elif self.op == "div":
+    elif bif == "div":
       b += '''
       (i32.shr_u (i32.xor (i32.const 0xF)) (i32.const 4))
       (local.set $temp)
@@ -57,7 +58,7 @@ class Bif:
       (i32.shl (local.get $temp) (i32.const 4))
       (i32.or (i32.const 0xF))
       '''
-    elif self.op == "rem":
+    elif bif == "rem":
       b += '''
       (i32.shr_u (i32.xor (i32.const 0xF)) (i32.const 4))
       (local.set $temp)
@@ -66,7 +67,7 @@ class Bif:
       (i32.shl (local.get $temp) (i32.const 4))
       (i32.or (i32.const 0xF))
       '''
-    elif self.op == "bsr":
+    elif bif == "bsr":
       b += '''
         (i32.const 4)
         (i32.shr_u)
@@ -74,18 +75,18 @@ class Bif:
         (i32.const 0xF)
         (i32.or)
       '''
-    elif self.op == "band":
+    elif bif == "band":
       b += '''
         (i32.and)
         (i32.const 0xF)
         (i32.or)
       '''
-    elif self.op == "fdiv":
+    elif bif == "fdiv":
       b += '(unreachable);; fdiv\n'
-    elif self.op == "fmul":
+    elif bif == "fmul":
       b += '(unreachable);; fdiv\n'
     else:
-      assert False, f'unknown bif {self.op}'
+      assert False, f'unknown bif {bif}'
 
     return b
 
@@ -265,29 +266,33 @@ class Bif:
     '''
 
   def to_wat(self, ctx):
-    b = f';; bif {self.op}\n'
+    (_mod, bif, arity) = ctx.resolve_import(self.import_id)
+    b = f';; bif {bif}\n'
+
+    assert arity == len(self.sargs)
+    assert _mod == 'erlang'
 
     fn_name = {
       '-': 'sub',
       '=/=': 'same',
       '==': 'eq',
-    }.get(self.op) or self.op
-    bif_fn = getattr(self, f'bif_{fn_name}', self.bif_inline)
+    }.get(bif) or bif
+    bif_fn = getattr(self, f'bif_{bif}', self.bif_inline)
     b += bif_fn(ctx)
 
     b += pop(ctx, *self.darg)
 
-    b += f';; end bif {self.op}\n'
+    b += f';; end bif {bif}\n'
 
     return b
 
 class GcBif(Bif):
-  def __init__(self, op, fdest, _max_regs, sargs, dest):
+  def __init__(self, fdest, _max_regs, bif, sarg1, sarg2, dest):
     [_f, fnumber] = fdest
-    assert _f == 'f'
+    assert _f == 'label'
 
-    self.sargs = sargs
+    self.sargs = [sarg1, sarg2]
     self.darg = arg(dest)
-    self.op = op
+    self.import_id = bif
     self.fnumber = fnumber
 

@@ -1,5 +1,7 @@
 import struct
 import zlib
+from ermod import Module, Func
+from nodes import Atom
 
 def consume_tuple(data, offset):
   ret = tuple()
@@ -74,8 +76,8 @@ def parse_literals(data):
     count -= 1
     ret.append(value)
 
-  for idx, literal in enumerate(ret):
-    print('literal', idx, literal)
+  # for idx, literal in enumerate(ret):
+  #  print('literal', idx, literal)
 
   return ret
 
@@ -117,7 +119,7 @@ def parse_atoms(data):
     atom = data[offset : offset + alen].decode('utf8')
     offset += alen
     count -= 1
-    ret += (atom,)
+    ret += (Atom(atom),)
 
   return ret
 
@@ -134,6 +136,20 @@ def parse_imports(data, atoms):
     count -= 1
 
     ret += ((mod, fn, arity),)
+
+  return ret
+
+def parse_exports(data, atoms):
+  (count,) = struct.unpack_from('>I', data)
+  offset = 4
+  ret = ()
+  while count > 0:
+    (fn, arity, start) = struct.unpack_from('>III', data, offset = offset)
+    fn = atoms[fn - 1]
+    offset += 12
+    count -= 1
+
+    ret += ((fn, arity, start),)
 
   return ret
 
@@ -216,14 +232,17 @@ def consume_arg(data, offset, literals, atoms, imports):
 def parse_code(data, literals, atoms, imports):
   offset = 0
   (header1, header2, header3, header4, header5) = struct.unpack_from('>IIIII', data, offset=offset)
+  """
   print('header1', hex(header1))
   print('header2', hex(header2))
   print('header3', hex(header3))
   print('header4', hex(header4))
   print('header5', hex(header5))
+  """
 
   offset += 20
 
+  ops = []
   dlen = len(data)
   while offset < dlen:
     op = data[offset]
@@ -241,24 +260,58 @@ def parse_code(data, literals, atoms, imports):
       arity -= 1
       args.append(arg)
 
-    print('op', cmd, args)
+    ops.append((cmd, args))
 
   assert op == 3 and offset == dlen
+
+
+  functions = []
+  current_label = None
+  for (cmd, args) in ops:
+    if cmd == 'label' and current_label:
+      functions[-1].statements.extend(current_label)
+
+    if cmd == 'label':
+      current_label = []
+
+    if cmd == 'label' and functions and not functions[-1].start_label:
+      [functions[-1].start_label] = args
+      # print('start label', args)
+
+    if cmd == 'func_info':
+      mod_name, func_name, arity = args
+      functions.append(Func(func_name, int(arity), None))
+
+    current_label.append(((cmd,) + tuple(args)))
+
+  functions[-1].statements.extend(current_label)
+
+  return functions
+
+def parse(data):
+  chunks = parse_beam_chunks(data)
+
+  atoms = parse_atoms(chunks['AtU8'])
+  imports = parse_imports(chunks['ImpT'], atoms)
+  exports = parse_exports(chunks['ExpT'], atoms)
+
+  literals = parse_literals(chunks['LitT']) if 'LitT' in chunks else []
+  code = parse_code(chunks['Code'], literals, atoms, imports)
+
+  return Module(
+    atoms[0],
+    [ (fn, arity) for (fn, arity, start) in exports ],
+    code,
+    {},
+    imports,
+  )
+
 
 def main(fname):
   with open(fname, 'rb') as beam_f:
     data = beam_f.read()
 
-  chunks = parse_beam_chunks(data)
-
-  atoms = parse_atoms(chunks['AtU8'])
-  imports = parse_imports(chunks['ImpT'], atoms)
-  literals = parse_literals(chunks['LitT']) if 'LitT' in chunks else []
-  parse_code(chunks['Code'], literals, atoms, imports)
-
-  print('atoms', atoms)
-  print('imports', imports)
-
+  parse(data)
 
 if __name__ == '__main__':
   import sys

@@ -1,15 +1,19 @@
 class Module:
-  def __init__(self, name, export_funcs, functions, attrs):
+  def __init__(self, name, export_funcs, functions, attrs, imports):
     self.name = name
     self.functions = functions
     self.export_funcs = export_funcs
     self.attrs = attrs
+    self.imports = imports
 
   def find_function(self, start_label):
     for func in self.functions:
       if func.start_label == start_label:
         return func
     raise ValueError(f'No function found {start_label}')
+
+  def resolve_import(self, import_id):
+    return self.imports[import_id]
 
 class Func:
   def __init__(self, name, arity, start_label):

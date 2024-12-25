@@ -79,9 +79,14 @@ def populate_stack_with(ctx, value):
 
   if isinstance(value, int):
     value = ['integer', value]
+  if isinstance(value, Atom):
+    value = ['atom', value]
 
   if value[0] == 'tr':
     value = value[1]
+
+  if value[0] == 'reg':
+    value = value[1:]
 
   [typ, val] = value
   b = ''
@@ -114,7 +119,9 @@ def populate_with(ctx, dtyp, dnum, value):
   return b
 
 def arg(value):
-  [typ, num] = value
+  assert len(value) == 3
+  [_reg, typ, num] = value
+  assert _reg == 'reg'
   typ = str(typ)
   assert typ in ('x', 'y', 'fr'), f'Wrong type {typ}'
   return typ, int(num)
