@@ -171,7 +171,7 @@ def produce_wasm(module):
         'move': Move,
         'test': Test,
         'bs_start_match4': BsStartMatch,
-        'bs_match': BsMatch,
+        'bs_match3': BsMatch,
         'bs_get_position': BsGetPosition,
         'bs_set_position': BsSetPosition,
         'bs_get_tail': BsGetTail,
@@ -189,6 +189,8 @@ def produce_wasm(module):
 
         'allocate': Allocate,
         'deallocate': Nop, # GC, wat gc?
+        'allocate_heap': Nop,
+        'test_heap': Nop,
         'trim': Trim,
         'swap': Swap,
         '%': VariableMetaNop,
@@ -217,7 +219,7 @@ def produce_wasm(module):
 
         'send': Send,
       }.get(styp)
-      if styp.startswith('is_'):
+      if styp.startswith('is_') or styp == 'bs_start_match3':
         op_imp = Test(styp, *sbody)
       else:
         op_imp = op_cls(*sbody) if op_cls else None
@@ -225,7 +227,7 @@ def produce_wasm(module):
       if op_imp:
         b += op_imp.to_wat(Ctx)
       else:
-        # assert False, f'No support for {styp} added yet'
+        assert False, f'No support for {styp} added yet'
         print('not implemented', styp)
         b += f'(nop) ;; ignore unknown opcode {styp}\n'
 

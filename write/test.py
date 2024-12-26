@@ -346,12 +346,12 @@ class Test3:
 
 
 class Test5:
-  def __init__(self, test_op, fail_dest, _dn, test_args, dest):
+  def __init__(self, test_op, fail_dest, test_arg, _dn, dest):
 
     [_f, fnumber] = fail_dest
-    assert _f == 'f'
+    assert _f == 'label'
     self.fnumber = fnumber
-    self.test_args = test_args
+    self.test_arg = test_arg
     self.test_op = test_op
     self.dreg = arg(dest)
 
@@ -367,8 +367,7 @@ class Test5:
     return b
 
   def test_bs_start_match3(self, ctx):
-    assert len(self.test_args) == 1
-    [match_ctx_reg] = self.test_args
+    match_ctx_reg = self.test_arg
     sreg = arg(match_ctx_reg)
 
     add_import(ctx, 'minibeam', 'make_match_context', 2)
@@ -463,7 +462,6 @@ class Test5:
 
 class Test:
   def __new__(cls, *args):
-    print('test', args)
     if len(args) < 5:
       return Test3(args[0], args[1], args[2:])
     

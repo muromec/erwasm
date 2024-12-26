@@ -3,14 +3,12 @@ from write.utils import push, pop, add_import, arg, populate_with, populate_stac
 class BsMatch:
   def __init__(self, fail_dest, sarg, command_table):
     [_f, fnumber] = fail_dest
-    assert _f == 'f'
+    assert _f == 'label'
     self.fnumber = fnumber
 
     self.sreg = arg(sarg)
-    [_c, table] = command_table
-    assert _c == 'commands'
-
-    self.commands = table
+    assert isinstance(command_table, list)
+    self.commands = command_table
 
   def to_wat(self, ctx):
     jump_depth = ctx.labels_to_idx.index(self.fnumber)
@@ -18,16 +16,18 @@ class BsMatch:
     b = f';; bs_match or fail to {self.fnumber}\n'
     b += f'(local.set $jump (i32.const {jump_depth}));; to label {self.fnumber}\n'
 
-    for cmd in self.commands:
-      cmd_name = cmd[0]
-      cmd_args = cmd[1:]
+    while self.commands:
+      cmd_name = self.commands.pop(0)
       b + ';; chech {cmd_name}'
 
       if cmd_name == '=:=':
         cmd_name = 'eq'
       fun = getattr(self, f'command_{cmd_name}')
+      arg_count = fun.__code__.co_argcount - 2 # self and ctx
+      cmd_args = self.commands[:arg_count]
       b += fun(ctx, *cmd_args)
       b += '(if (i32.eqz) (then (br $start)))\n'
+      self.commands = self.commands[arg_count:]
 
 
     b += ';; end of bs_match\n'

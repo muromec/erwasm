@@ -9,8 +9,8 @@ class PutTuple2:
     b = ';; put_tuple2\n'
     add_import(ctx, 'minibeam', 'tuple_alloc', 1)
 
-    [_list, vlist] = self.value
-    assert _list == 'list'
+    vlist = self.value
+    assert isinstance(vlist, list)
 
     size = len(vlist)
     b += f'(call $minibeam_tuple_alloc_1 (i32.const {size}))\n'

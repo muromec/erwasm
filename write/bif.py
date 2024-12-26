@@ -278,7 +278,6 @@ class Bif:
       '=/=': 'same',
       '==': 'eq',
     }.get(bif) or bif
-    print('found bif', bif, fn_name)
     bif_fn = getattr(self, f'bif_{fn_name}', self.bif_inline)
     b += bif_fn(ctx)
 
