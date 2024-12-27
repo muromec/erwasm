@@ -52,6 +52,21 @@ class BadMatch:
       (br $start)
     '''
 
+class Raise:
+  def __init__(self, typ, reason):
+    self.reason = reason
+    self.typ = typ
+
+  def to_wat(self, ctx):
+    add_import(ctx, 'erlang', 'throw', 2)
+
+    push_r = populate_stack_with(ctx, self.reason)
+    push_t = populate_stack_with(ctx, self.typ)
+
+    return f'''
+      (call $erlang_throw_2 {push_t} {typ_t}) (drop)
+      (br $start)
+    '''
 class CaseEnd:
   def __init__(self, reason):
     self.reason = reason

@@ -14,6 +14,16 @@ def consume_tuple(data, offset):
 
   return (ret, offset)
 
+def consume_list(data, offset):
+  ret = []
+  (list_len, offset) = consume_int(data, offset)
+  while list_len > 0:
+    (part, offset) = consume_value(data, offset)
+    ret.append(part)
+    list_len -= 1
+
+  assert data[offset] == 106
+  return (ret, offset + 1)
 
 def consume_small_int(data, offset):
   value = data[offset]
@@ -45,6 +55,7 @@ consumers = {
   0x68: consume_tuple,
   0x61: consume_small_int,
   0x62: consume_int,
+  0x6c: consume_list,
   0x6d: consume_bin,
   0x77: consume_atom,
 }
@@ -177,13 +188,17 @@ op_tab = {
   0x32: ('is_reference', 2),
   0x35: ('is_binary', 2),
   0x3b: ('select_val', 3),
+  0x3d: ('jump', 1),
   0x40: ('move', 2),
   0x4e: ('call_ext_only', 2),
   0x4a: ('case_end', 1), # this raises error
+  0x48: ('badmatch', 1),
   0x6c: ('raise', 2),
   0x6e: ('bs_bits_to_bytes', 3),
   0x72: ('is_boolean', 2),
   0x7d: ('gc_bif2', 6),
+  0x8a: ('bs_get_utf8', 5),
+  0x8c: ('bs_get_utf16', 5),
   0x99: ('line', 1),
   0xa0: ('build_stacktrace', 0),
   0xa4: ('put_tuple2', 2),
@@ -192,6 +207,8 @@ op_tab = {
   0xa7: ('bs_get_position', 3),
   0xa8: ('bs_set_position', 2),
   0xa9: ('swap', 2),
+  0xaa: ('bs_start_match4', 4),
+  0xb1: ('bs_create_bin', 6),
   0xb6: ('bs_match3', 3),
 }
 
@@ -237,8 +254,8 @@ def decode_z(data, offset, literals, atoms, imports):
   typ_n = data[offset] >> 4
   if typ_n == 1:
     value = []
-    asize = data[offset + 1] >> 4
-    offset = offset + 2
+    (asize, offset) = decode_int(data, offset + 1)
+    # print('got array sized', asize)
 
     while asize:
       (apart, offset) = consume_arg(data, offset, literals, atoms, imports)
@@ -261,7 +278,7 @@ def decode_z(data, offset, literals, atoms, imports):
 def consume_arg(data, offset, literals, atoms, imports):
   value = data[offset]
   tag = tags[value & 0b111]
-  # print('consume arg', tag, value)
+  # print('consume arg', tag, value, data[offset:offset + 10].hex())
 
   if tag == 'z':
     return decode_z(data, offset, literals, atoms, imports)

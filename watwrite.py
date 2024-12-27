@@ -15,7 +15,7 @@ from write.call import (
 )
 from write.function import MakeFun3, CallFun2
 from write.bif import GcBif, Bif
-from write.block import Label, FuncInfo, BadMatch, CaseEnd, Nop
+from write.block import Label, FuncInfo, BadMatch, CaseEnd, Nop, Raise
 from write.regs import Allocate, Trim, VariableMetaNop, Swap
 from write.proc import Send
 from write.exception import Try, TryEnd, TryCase, TryCaseEnd
@@ -178,6 +178,7 @@ def produce_wasm(module):
         'bs_create_bin': BsCreateBin,
         'return': Ret,
         'select_val': SelectVal,
+        'raise': Raise,
         'badmatch': BadMatch,
         'case_end': CaseEnd,
 
@@ -219,7 +220,12 @@ def produce_wasm(module):
 
         'send': Send,
       }.get(styp)
-      if styp.startswith('is_') or styp == 'bs_start_match3':
+      test_commands = [
+        'bs_start_match3',
+        'bs_get_utf8',
+        'bs_get_utf16',
+      ]
+      if styp.startswith('is_') or styp in test_commands:
         op_imp = Test(styp, *sbody)
       else:
         op_imp = op_cls(*sbody) if op_cls else None

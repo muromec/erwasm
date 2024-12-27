@@ -2,7 +2,7 @@
 class Jump:
   def __init__(self, dest):
     [_f, fnumber] = dest
-    assert _f == 'f'
+    assert _f == 'label'
     self.fnumber = fnumber
 
   def to_wat(self, ctx):

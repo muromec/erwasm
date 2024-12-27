@@ -1,4 +1,5 @@
 from write.utils import push, pop, add_import, arg, populate_with, populate_stack_with
+from nodes import Atom
 
 class BsMatch:
   def __init__(self, fail_dest, sarg, command_table):
@@ -197,16 +198,14 @@ class BsGetTail:
      \n'''
 
 class BsStartMatch:
-  def __init__(self, params, max_regs, sarg, darg):
-    [_a, op] = params
+  def __init__(self, mode, max_regs, sarg, darg):
 
     self.sarg = sarg
     self.sreg = arg(sarg)
     self.dreg = arg(darg)
     self.max_regs = max_regs
-    self.op = op
-    assert _a == 'atom'
-    assert op == 'resume' or op == 'no_fail'
+    self.op = mode
+    assert mode == 'resume' or mode == 'no_fail'
 
   def to_wat(self, ctx):
     b = f';; bs_start_match4 {self.sreg} -> {self.dreg} ({self.op})\n'
@@ -232,8 +231,7 @@ class BsStartMatch:
 class BsCreateBin:
   def __init__(self, fdest, alloc, live, unit, darg, ops):
     self.dreg = arg(darg)
-    [_list, ops] = ops
-    assert _list == 'list'
+    assert isinstance(ops, list)
     self.ops = ops
 
   def to_wat(self, ctx):
@@ -250,7 +248,7 @@ class BsCreateBin:
     to_read = []
 
     while ops:
-      (_atom, typ) = ops.pop(0)
+      typ = ops.pop(0)
       _ignore_align = ops.pop(0)
       unit_size = ops.pop(0)
       _nil = ops.pop(0)
@@ -264,13 +262,11 @@ class BsCreateBin:
       args = []
       while ops:
         arg = ops.pop(0)
-        if not isinstance(arg, tuple):
+        if arg == 'all':
           pass
-        elif arg[0] == 'atom' and arg[1] == 'all':
+        elif arg == 'undefined':
           pass
-        elif arg[0] == 'atom' and arg[1] == 'undefined':
-          pass
-        elif arg[0] == 'atom':
+        elif isinstance(arg, Atom):
           ops.insert(0, arg)
           to_read.append((value, typ, unit_size, args))
           break
@@ -282,15 +278,11 @@ class BsCreateBin:
     b += '(local.set $temp (i32.const 0))\n'
 
     def int_size(option):
-      if not isinstance(option, (list, tuple)):
-        return
-      if option[0] == 'integer':
-        return int(option[1])
+      if isinstance(option, int):
+        return option
 
     def match_op(op_name, option):
-      if not isinstance(option, (list, tuple)):
-        return
-      return option[0] == 'atom' and option[1] == op_name
+      return option == op_name
 
     def find_op(values, fn):
       for value in values:
@@ -329,7 +321,6 @@ class BsCreateBin:
         '''
 
       elif units is None:
-        print('v', segment, typ, args)
         raise ValueError('Segment doesnt have measuring instruction and doesnt have pre defined value too')
       else:
         assert units is not None

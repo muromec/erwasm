@@ -74,14 +74,14 @@ def move(ctx, styp, snum, dtyp, dnum):
   return b
 
 def populate_stack_with(ctx, value):
-  if value == 'nil':
+  if value == 'nil' or value is None:
     return '(i32.const 0x3b)\n'
 
   if isinstance(value, int):
     value = ['integer', value]
   if isinstance(value, Atom):
     value = ['atom', value]
-  if isinstance(value, bytes):
+  if isinstance(value, (bytes, tuple, list)):
     value = ['literal', value]
 
   if value[0] == 'tr':

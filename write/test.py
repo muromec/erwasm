@@ -351,7 +351,7 @@ class Test5:
     [_f, fnumber] = fail_dest
     assert _f == 'label'
     self.fnumber = fnumber
-    self.test_arg = test_arg
+    self.test_args = [test_arg]
     self.test_op = test_op
     self.dreg = arg(dest)
 
@@ -367,7 +367,7 @@ class Test5:
     return b
 
   def test_bs_start_match3(self, ctx):
-    match_ctx_reg = self.test_arg
+    [match_ctx_reg] = self.test_args
     sreg = arg(match_ctx_reg)
 
     add_import(ctx, 'minibeam', 'make_match_context', 2)
@@ -390,10 +390,6 @@ class Test5:
   def test_bs_get_utf8(self, ctx):
     add_import(ctx, 'minibeam', 'get_utf8_from_ctx', 1)
 
-    [_tr, match_ctx_reg, [_reg_type, _n]] = self.test_args[0]
-    assert _tr == 'tr'
-    assert _reg_type == 't_bs_context'
-
     return f'''
       { populate_stack_with(ctx, self.test_args[0]) }
       (call $minibeam_get_utf8_from_ctx_1)
@@ -412,10 +408,6 @@ class Test5:
 
   def test_bs_get_utf16(self, ctx):
     add_import(ctx, 'minibeam', 'get_utf16_from_ctx', 1)
-
-    [_tr, match_ctx_reg, [_reg_type, _n]] = self.test_args[0]
-    assert _tr == 'tr'
-    assert _reg_type == 't_bs_context'
 
     return f'''
       { populate_stack_with(ctx, self.test_args[0]) }
@@ -459,6 +451,17 @@ class Test5:
 
     '''
 
+class Test6(Test5):
+  def __init__(self, test_op, fail_dest, test_arg, _dn, _alive, dest):
+
+    [_f, fnumber] = fail_dest
+    assert _f == 'label'
+    self.fnumber = fnumber
+    self.test_args = [test_arg]
+    self.test_op = test_op
+    self.dreg = arg(dest)
+
+
 
 class Test:
   def __new__(cls, *args):
@@ -467,6 +470,9 @@ class Test:
     
     if len(args) == 5:
       return Test5(*args)
+
+    if len(args) == 6:
+      return Test6(*args)
 
     assert False
 
